@@ -16,7 +16,7 @@ export default function Home() {
           <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center">
             <Plane className="w-3.5 h-3.5 text-primary-foreground" />
           </div>
-          <span className="text-base font-semibold text-foreground tracking-tight">TripSync</span>
+          <span className="text-base font-semibold text-foreground tracking-tight">OutTheGC</span>
         </div>
         <button
           onClick={() => setModalOpen(true)}
@@ -30,11 +30,11 @@ export default function Home() {
       <section className="flex-1 flex flex-col items-center justify-center text-center px-6 pt-16 pb-8">
         <div className="inline-flex items-center gap-2 bg-accent/40 text-accent-foreground text-xs font-semibold px-3.5 py-1.5 rounded-full mb-8">
           <span className="w-1.5 h-1.5 rounded-full bg-primary inline-block" />
-          Group travel, simplified
+          Finally get your trip out of the gc
         </div>
 
         <h1 className="text-5xl sm:text-6xl font-bold text-foreground tracking-tight leading-tight text-balance max-w-2xl mb-5">
-          Plan a trip together
+          Stop arguing in the group chat
         </h1>
 
         <p className="text-lg text-muted-foreground max-w-md leading-relaxed text-pretty mb-10">
@@ -62,7 +62,7 @@ export default function Home() {
 
       {/* Footer */}
       <footer className="text-center text-xs text-muted-foreground py-6 border-t border-border">
-        © {new Date().getFullYear()} TripSync. Made for adventurers.
+        © {new Date().getFullYear()} OutTheGC. Finally get your trip out of the gc.
       </footer>
 
       <CreateTripModal open={modalOpen} onClose={() => setModalOpen(false)} />

@@ -20,9 +20,9 @@ export function CreateTripModal({ open, onClose }: CreateTripModalProps) {
 
   function handleGenerate(e: React.FormEvent) {
     e.preventDefault()
-    const slug = tripName.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "") || "my-trip"
-    const id = Math.random().toString(36).slice(2, 8)
-    setLink(`tripsync.app/trip/${slug}-${id}`)
+    const id = Math.random().toString(36).slice(2, 12)
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://outthegc.app'
+    setLink(`${baseUrl}/event/${id}`)
     setGenerated(true)
   }
 

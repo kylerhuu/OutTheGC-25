@@ -6,8 +6,8 @@ import './globals.css'
 const inter = Inter({ subsets: ['latin'], variable: '--font-sans' });
 
 export const metadata: Metadata = {
-  title: 'TripSync — Plan a trip together',
-  description: 'Collect availability, ideas, and preferences in one shared link. Group trip planning made simple.',
+  title: 'OutTheGC',
+  description: 'finally get your trip out of the gc',
   generator: 'v0.app',
   icons: {
     icon: [

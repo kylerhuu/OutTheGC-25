@@ -1,19 +1,23 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
+import { useParams } from 'next/navigation'
 import { EventTopBar } from '@/components/tripsync/event-top-bar'
 import { EventInputPanel } from '@/components/tripsync/event-input-panel'
 import { EventSummaryPanel } from '@/components/tripsync/event-summary-panel'
 
-// Mock trip data - in production this would come from a database
-const MOCK_TRIP = {
-  id: 'summer-2026-europe',
-  name: 'Summer 2026 Europe Trip',
-  dateRange: {
-    from: new Date(2026, 5, 15), // June 15, 2026
-    to: new Date(2026, 6, 15),   // July 15, 2026
-  },
-  shareUrl: 'https://tripsync.app/event/summer-2026-europe',
+function generateMockTrip(tripId: string) {
+  // Generate consistent mock data based on tripId
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://outthegc.app'
+  return {
+    id: tripId,
+    name: `Trip: ${tripId}`,
+    dateRange: {
+      from: new Date(2026, 5, 15), // June 15, 2026
+      to: new Date(2026, 6, 15),   // July 15, 2026
+    },
+    shareUrl: `${baseUrl}/event/${tripId}`,
+  }
 }
 
 // Mock existing participants
@@ -50,6 +54,10 @@ interface ParticipantData {
 }
 
 export default function EventPage() {
+  const params = useParams()
+  const tripId = params.tripId as string
+  const mockTrip = useMemo(() => generateMockTrip(tripId), [tripId])
+  
   const [participants, setParticipants] = useState<ParticipantData[]>(MOCK_PARTICIPANTS)
   const [hasSubmitted, setHasSubmitted] = useState(false)
   const [tripDuration, setTripDuration] = useState(7)
@@ -84,10 +92,10 @@ export default function EventPage() {
         <div className="flex flex-col gap-6">
           {/* Top Bar */}
           <EventTopBar
-            tripName={MOCK_TRIP.name}
-            dateRange={formatDateRange(MOCK_TRIP.dateRange.from, MOCK_TRIP.dateRange.to)}
+            tripName={mockTrip.name}
+            dateRange={formatDateRange(mockTrip.dateRange.from, mockTrip.dateRange.to)}
             responseCount={participants.length}
-            shareUrl={MOCK_TRIP.shareUrl}
+            shareUrl={mockTrip.shareUrl}
           />
 
           {/* Main Content - Two Column Layout */}
@@ -95,7 +103,7 @@ export default function EventPage() {
             {/* Input Panel - 3/5 width on desktop */}
             <div className="lg:col-span-3">
               <EventInputPanel
-                tripDateRange={MOCK_TRIP.dateRange}
+                tripDateRange={mockTrip.dateRange}
                 onSubmit={handleSubmit}
                 hasSubmitted={hasSubmitted}
               />
