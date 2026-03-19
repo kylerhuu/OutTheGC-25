@@ -106,22 +106,22 @@ export function EventSummaryPanel({
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-5">
       {/* Participants */}
-      <Card className="bg-card border-border">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2">
+      <Card className="bg-card border-border/60 shadow-sm">
+        <CardHeader className="pb-3.5">
+          <CardTitle className="text-sm font-semibold flex items-center gap-2 text-foreground">
             <Users className="size-4 text-primary" />
-            Participants
+            Participants ({totalParticipants})
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pt-0">
           {totalParticipants === 0 ? (
-            <p className="text-sm text-muted-foreground">No responses yet</p>
+            <p className="text-xs text-muted-foreground">No responses yet</p>
           ) : (
             <div className="flex flex-wrap gap-2">
               {participants.map((p, i) => (
-                <Badge key={i} variant="secondary">{p.name}</Badge>
+                <Badge key={i} variant="secondary" className="text-xs font-medium">{p.name}</Badge>
               ))}
             </div>
           )}
@@ -129,16 +129,16 @@ export function EventSummaryPanel({
       </Card>
 
       {/* Best Time Windows */}
-      <Card className="bg-card border-border">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2">
+      <Card className="bg-gradient-to-b from-primary/5 to-card border-primary/20 shadow-sm">
+        <CardHeader className="pb-3.5">
+          <CardTitle className="text-sm font-semibold flex items-center gap-2 text-foreground">
             <Calendar className="size-4 text-primary" />
             Best Time Windows
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pt-0">
           {bestWindows.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
+            <p className="text-xs text-muted-foreground">
               {availabilities.length === 0 
                 ? 'Waiting for availability responses' 
                 : 'No overlapping availability found'}
@@ -146,18 +146,18 @@ export function EventSummaryPanel({
           ) : (
             <div className="flex flex-col gap-3">
               {bestWindows.map((window, i) => (
-                <div key={i} className="flex flex-col gap-1">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">
-                      {formatDate(window.from)} - {formatDate(window.to)}
+                <div key={i} className="flex flex-col gap-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-semibold text-foreground">
+                      {formatDate(window.from)} – {formatDate(window.to)}
                     </span>
-                    <Badge variant="outline" className="text-xs">
+                    <Badge variant="outline" className="text-xs font-medium bg-primary/10 text-primary border-primary/20">
                       {window.days} days
                     </Badge>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Progress value={(window.participants / totalParticipants) * 100} className="flex-1 h-1.5" />
-                    <span className="text-xs text-muted-foreground">
+                    <Progress value={(window.participants / totalParticipants) * 100} className="flex-1 h-2 rounded-full" />
+                    <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">
                       {window.participants}/{totalParticipants}
                     </span>
                   </div>
@@ -169,15 +169,15 @@ export function EventSummaryPanel({
       </Card>
 
       {/* Trip Duration */}
-      <Card className="bg-card border-border">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Trip Duration</CardTitle>
+      <Card className="bg-card border-border/60 shadow-sm">
+        <CardHeader className="pb-3.5">
+          <CardTitle className="text-sm font-semibold text-foreground">Trip Duration</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pt-0">
           <div className="flex flex-col gap-4">
-            <div className="flex items-center justify-between">
-              <span className="text-2xl font-semibold text-primary">{tripDuration}</span>
-              <span className="text-muted-foreground text-sm">days</span>
+            <div className="flex items-baseline gap-2">
+              <span className="text-3xl font-bold text-primary">{tripDuration}</span>
+              <span className="text-muted-foreground text-xs font-medium">days</span>
             </div>
             <Slider
               value={[tripDuration]}
@@ -185,37 +185,36 @@ export function EventSummaryPanel({
               min={3}
               max={14}
               step={1}
+              className="[&_[role=slider]]:bg-primary [&_[role=slider]]:border-2 [&_[role=slider]]:border-primary-foreground"
             />
-            <div className="flex justify-between text-xs text-muted-foreground">
-              <span>3 days</span>
-              <span>14 days</span>
+            <div className="flex justify-between text-xs text-muted-foreground font-medium">
+              <span>3</span>
+              <span>14</span>
             </div>
           </div>
         </CardContent>
       </Card>
 
       {/* Top Destinations */}
-      <Card className="bg-card border-border">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2">
+      <Card className="bg-card border-border/60 shadow-sm">
+        <CardHeader className="pb-3.5">
+          <CardTitle className="text-sm font-semibold flex items-center gap-2 text-foreground">
             <MapPin className="size-4 text-primary" />
             Top Destinations
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pt-0">
           {sortedDestinations.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No destination votes yet</p>
+            <p className="text-xs text-muted-foreground">No destination votes yet</p>
           ) : (
             <div className="flex flex-col gap-3">
               {sortedDestinations.map(([dest, count]) => (
-                <div key={dest} className="flex items-center gap-3">
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-sm font-medium">{dest}</span>
-                      <span className="text-xs text-muted-foreground">{count} votes</span>
-                    </div>
-                    <Progress value={(count / totalParticipants) * 100} className="h-1.5" />
+                <div key={dest} className="flex flex-col gap-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-foreground">{dest}</span>
+                    <span className="text-xs font-medium text-primary">{count} {count === 1 ? 'vote' : 'votes'}</span>
                   </div>
+                  <Progress value={(count / totalParticipants) * 100} className="h-2 rounded-full" />
                 </div>
               ))}
             </div>
@@ -224,23 +223,23 @@ export function EventSummaryPanel({
       </Card>
 
       {/* Budget Distribution */}
-      <Card className="bg-card border-border">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2">
+      <Card className="bg-card border-border/60 shadow-sm">
+        <CardHeader className="pb-3.5">
+          <CardTitle className="text-sm font-semibold flex items-center gap-2 text-foreground">
             <DollarSign className="size-4 text-primary" />
             Budget Distribution
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pt-0">
           {Object.keys(budgetCounts).length === 0 ? (
-            <p className="text-sm text-muted-foreground">No budget responses yet</p>
+            <p className="text-xs text-muted-foreground">No budget responses yet</p>
           ) : (
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-2.5">
               {Object.entries(budgetCounts).map(([budget, count]) => (
                 <div key={budget} className="flex items-center justify-between">
-                  <span className="text-sm">{budgetLabels[budget] || budget}</span>
-                  <Badge variant="secondary" className="text-xs">
-                    {count} {count === 1 ? 'person' : 'people'}
+                  <span className="text-xs font-medium text-foreground">{budgetLabels[budget] || budget}</span>
+                  <Badge variant="secondary" className="text-xs font-medium">
+                    {count}
                   </Badge>
                 </div>
               ))}
@@ -250,22 +249,22 @@ export function EventSummaryPanel({
       </Card>
 
       {/* Interests */}
-      <Card className="bg-card border-border">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2">
+      <Card className="bg-card border-border/60 shadow-sm">
+        <CardHeader className="pb-3.5">
+          <CardTitle className="text-sm font-semibold flex items-center gap-2 text-foreground">
             <Heart className="size-4 text-primary" />
             Top Interests
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pt-0">
           {sortedInterests.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No interest responses yet</p>
+            <p className="text-xs text-muted-foreground">No interest responses yet</p>
           ) : (
             <div className="flex flex-wrap gap-2">
               {sortedInterests.map(([interest, count]) => (
-                <Badge key={interest} variant="outline" className="gap-1">
+                <Badge key={interest} variant="outline" className="gap-1.5 text-xs font-medium bg-primary/5 text-primary border-primary/20 hover:border-primary/40">
                   {interestLabels[interest] || interest}
-                  <span className="text-muted-foreground">({count})</span>
+                  <span className="font-semibold">{count}</span>
                 </Badge>
               ))}
             </div>

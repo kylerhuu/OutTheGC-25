@@ -104,16 +104,16 @@ export function EventInputPanel({ tripDateRange, onSubmit, hasSubmitted = false 
 
   if (hasSubmitted) {
     return (
-      <Card className="bg-card border-border">
-        <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-          <div className="size-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
-            <svg className="size-6 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+      <Card className="bg-gradient-to-b from-primary/5 to-card border-primary/20">
+        <CardContent className="flex flex-col items-center justify-center py-16 text-center">
+          <div className="size-14 rounded-full bg-primary/15 flex items-center justify-center mb-5">
+            <svg className="size-7 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
             </svg>
           </div>
-          <h3 className="text-lg font-medium text-foreground mb-2">Response Submitted</h3>
-          <p className="text-muted-foreground text-sm">
-            Thanks for sharing your preferences! The summary will update as others respond.
+          <h3 className="text-lg font-semibold text-foreground mb-2">Response Submitted</h3>
+          <p className="text-muted-foreground text-sm max-w-xs">
+            Thanks for sharing! Your preferences are helping plan the perfect trip.
           </p>
         </CardContent>
       </Card>
@@ -121,28 +121,31 @@ export function EventInputPanel({ tripDateRange, onSubmit, hasSubmitted = false 
   }
 
   return (
-    <Card className="bg-card border-border">
-      <CardHeader>
-        <CardTitle className="text-lg">Share Your Preferences</CardTitle>
-        <CardDescription>Help plan the perfect trip by sharing your availability and ideas</CardDescription>
+    <Card className="bg-card border-border/60 shadow-sm">
+      <CardHeader className="pb-6">
+        <CardTitle className="text-2xl font-semibold">Share Your Preferences</CardTitle>
+        <CardDescription className="text-sm text-muted-foreground">Tell us when you're available and what you'd like to do</CardDescription>
       </CardHeader>
-      <CardContent className="flex flex-col gap-6">
+      <CardContent className="flex flex-col gap-8">
         {/* Name */}
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="name">Your Name</Label>
+        <div className="flex flex-col gap-3">
+          <Label htmlFor="name" className="text-sm font-medium">Your Name</Label>
           <Input
             id="name"
             placeholder="Enter your name"
             value={name}
             onChange={(e) => setName(e.target.value)}
+            className="h-10 text-base"
           />
         </div>
 
         {/* Availability Calendar */}
-        <div className="flex flex-col gap-2">
-          <Label>Your Availability</Label>
-          <p className="text-sm text-muted-foreground">Select the dates you can travel</p>
-          <div className="border border-border rounded-lg p-2 bg-background overflow-hidden">
+        <div className="flex flex-col gap-3 pt-2">
+          <div>
+            <Label className="text-sm font-medium block mb-1">Your Availability</Label>
+            <p className="text-xs text-muted-foreground">Select when you can travel</p>
+          </div>
+          <div className="border border-border/60 rounded-xl p-4 bg-card/50 overflow-hidden shadow-sm">
             <Calendar
               mode="range"
               selected={availability}
@@ -150,19 +153,30 @@ export function EventInputPanel({ tripDateRange, onSubmit, hasSubmitted = false 
               disabled={{ before: tripDateRange.from, after: tripDateRange.to }}
               defaultMonth={tripDateRange.from}
               numberOfMonths={1}
+              className="w-full [&_.rdp]:w-full [&_.rdp_cell]:w-1/7"
             />
           </div>
+          {availability?.from && availability?.to && (
+            <div className="flex items-center gap-2 text-sm text-primary font-medium bg-primary/5 px-3 py-2 rounded-lg">
+              <svg className="size-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
+              {availability.from.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – {availability.to.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+            </div>
+          )}
         </div>
 
         {/* Destinations */}
-        <div className="flex flex-col gap-2">
-          <Label>Destination Ideas</Label>
+        <div className="flex flex-col gap-3 pt-2">
+          <Label className="text-sm font-medium">Destination Ideas</Label>
           <div className="flex flex-wrap gap-2">
             {DESTINATION_SUGGESTIONS.map(dest => (
               <Badge
                 key={dest}
                 variant={destinations.includes(dest) ? 'default' : 'outline'}
-                className="cursor-pointer transition-colors"
+                className={`cursor-pointer transition-all text-xs font-medium py-1 px-3 ${
+                  destinations.includes(dest)
+                    ? 'bg-primary text-primary-foreground border-primary'
+                    : 'hover:border-primary/50'
+                }`}
                 onClick={() => 
                   destinations.includes(dest) 
                     ? removeDestination(dest) 
@@ -171,35 +185,36 @@ export function EventInputPanel({ tripDateRange, onSubmit, hasSubmitted = false 
               >
                 {dest}
                 {destinations.includes(dest) && (
-                  <X className="size-3 ml-1" />
+                  <X className="size-3 ml-1.5" />
                 )}
               </Badge>
             ))}
           </div>
-          <div className="flex gap-2 mt-2">
+          <div className="flex gap-2 mt-1">
             <Input
               placeholder="Add custom destination"
               value={customDestination}
               onChange={(e) => setCustomDestination(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && addDestination(customDestination)}
-              className="flex-1"
+              className="flex-1 h-9 text-sm"
             />
             <Button
-              size="icon"
-              variant="outline"
+              size="sm"
               onClick={() => addDestination(customDestination)}
               disabled={!customDestination.trim()}
+              className="gap-1"
             >
               <Plus className="size-4" />
+              Add
             </Button>
           </div>
         </div>
 
         {/* Budget */}
-        <div className="flex flex-col gap-2">
-          <Label>Budget Range</Label>
+        <div className="flex flex-col gap-3 pt-2">
+          <Label className="text-sm font-medium">Budget Range</Label>
           <Select value={budget} onValueChange={setBudget}>
-            <SelectTrigger className="w-full">
+            <SelectTrigger className="h-10 text-base border-border/60">
               <SelectValue placeholder="Select your budget" />
             </SelectTrigger>
             <SelectContent>
@@ -213,8 +228,8 @@ export function EventInputPanel({ tripDateRange, onSubmit, hasSubmitted = false 
         </div>
 
         {/* Interests */}
-        <div className="flex flex-col gap-2">
-          <Label>Trip Interests</Label>
+        <div className="flex flex-col gap-3 pt-2">
+          <Label className="text-sm font-medium">Trip Interests</Label>
           <div className="flex flex-wrap gap-2">
             {INTEREST_OPTIONS.map(interest => (
               <Toggle
@@ -223,6 +238,11 @@ export function EventInputPanel({ tripDateRange, onSubmit, hasSubmitted = false 
                 size="sm"
                 pressed={interests.includes(interest.id)}
                 onPressedChange={() => toggleInterest(interest.id)}
+                className={`text-xs font-medium transition-colors ${
+                  interests.includes(interest.id)
+                    ? 'bg-primary text-primary-foreground border-primary'
+                    : 'hover:border-primary/50'
+                }`}
               >
                 {interest.label}
               </Toggle>
@@ -234,7 +254,7 @@ export function EventInputPanel({ tripDateRange, onSubmit, hasSubmitted = false 
         <Button
           onClick={handleSubmit}
           disabled={!isValid || isSubmitting}
-          className="w-full mt-2"
+          className="w-full mt-6 h-11 font-medium text-base"
         >
           {isSubmitting ? (
             <>

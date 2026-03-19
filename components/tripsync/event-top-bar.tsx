@@ -22,30 +22,29 @@ export function EventTopBar({ tripName, dateRange, responseCount, shareUrl }: Ev
   }
 
   return (
-    <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-border bg-card px-6 py-4 rounded-xl shadow-sm">
-      <div className="flex flex-col gap-1">
+    <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between border-b border-border/50 bg-gradient-to-b from-card/80 to-card/40 px-8 py-6 rounded-xl">
+      <div className="flex flex-col gap-2">
+        <h1 className="text-2xl font-semibold text-foreground text-balance">{tripName}</h1>
         <div className="flex items-center gap-3">
-          <h1 className="text-xl font-semibold text-foreground text-balance">{tripName}</h1>
-          <Badge variant="secondary" className="text-xs">
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <Calendar className="size-4" />
+            <span className="text-sm">{dateRange}</span>
+          </div>
+          <Badge variant="secondary" className="text-xs font-medium">
             {responseCount} {responseCount === 1 ? 'response' : 'responses'}
           </Badge>
-        </div>
-        <div className="flex items-center gap-2 text-muted-foreground text-sm">
-          <Calendar className="size-4" />
-          <span>{dateRange}</span>
         </div>
       </div>
       
       <Button
-        variant="outline"
-        size="sm"
         onClick={handleCopy}
-        className="w-fit gap-2"
+        size="sm"
+        className="w-fit gap-2 bg-primary hover:bg-primary/90 text-primary-foreground font-medium"
       >
         {copied ? (
           <>
             <Check className="size-4" />
-            Copied
+            Copied!
           </>
         ) : (
           <>
