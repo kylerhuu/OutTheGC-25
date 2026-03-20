@@ -89,14 +89,17 @@ export function EventSummaryPanel({
       {/* Clickable Participants */}
       <Card className="bg-card border-border/60 shadow-sm">
         <CardHeader className="pb-3.5">
-          <CardTitle className="text-sm font-semibold flex items-center gap-2 text-foreground">
-            <Users className="size-4 text-primary" />
-            Participants ({totalParticipants})
-          </CardTitle>
+        <CardTitle className="text-sm font-semibold flex items-center gap-2 text-foreground">
+          <Users className="size-4 text-primary" />
+          Participants ({totalParticipants})
+        </CardTitle>
         </CardHeader>
         <CardContent className="pt-0">
           {totalParticipants === 0 ? (
-            <p className="text-xs text-muted-foreground">No responses yet</p>
+            <div className="space-y-2">
+              <p className="text-xs text-muted-foreground">No responses yet</p>
+              <p className="text-xs text-muted-foreground">Share the link above to start collecting answers.</p>
+            </div>
           ) : (
             <div className="flex flex-wrap gap-2">
               {participants.map((p) => (

@@ -7,11 +7,11 @@
   },
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && next build",
+    "build": "DATABASE_URL=\"${DATABASE_URL:-file:./prisma/dev.db}\" prisma generate && next build",
     "start": "next start",
     "lint": "eslint .",
-    "db:generate": "prisma generate",
-    "postinstall": "prisma generate"
+    "db:generate": "DATABASE_URL=\"${DATABASE_URL:-file:./prisma/dev.db}\" prisma generate",
+    "postinstall": "DATABASE_URL=\"${DATABASE_URL:-file:./prisma/dev.db}\" prisma generate"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",

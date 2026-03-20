@@ -132,6 +132,10 @@ export function EventInputPanel({
 
   const handleSubmit = async () => {
     if (!name.trim()) return
+    if (availability && (!availability.from || !availability.to)) {
+      setSubmitError('Please select a complete availability range or clear it.')
+      return
+    }
     
     setIsSubmitting(true)
     setSubmitError('')
@@ -423,6 +427,10 @@ export function EventInputPanel({
 
         {submitError && (
           <p className="text-sm text-destructive">{submitError}</p>
+        )}
+
+        {!submitError && !availability?.to && availability?.from && (
+          <p className="text-xs text-muted-foreground">Pick an end date to save an availability range.</p>
         )}
       </CardContent>
     </Card>

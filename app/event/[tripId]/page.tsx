@@ -25,6 +25,16 @@ interface TripAccess {
   editCode: string
 }
 
+interface TripResponsePayload {
+  trip?: TripWithResponses
+  error?: string
+}
+
+interface SaveResponsePayload {
+  response?: ResponseRecord
+  error?: string
+}
+
 function getTripAccessKey(tripId: string) {
   return `outthegc:trip-access:${tripId}`
 }
@@ -70,7 +80,7 @@ export default function EventPage() {
 
     try {
       const response = await fetch(`/api/trips/${tripId}`, { cache: 'no-store' })
-      const data = (await response.json()) as { trip?: TripWithResponses; error?: string }
+      const data = (await response.json()) as TripResponsePayload
 
       if (!response.ok || !data.trip) {
         throw new Error(data.error || 'Unable to load trip.')
@@ -82,7 +92,16 @@ export default function EventPage() {
       setParticipants(nextParticipants)
 
       const storedAccessRaw = window.localStorage.getItem(getTripAccessKey(tripId))
-      const storedAccess = storedAccessRaw ? (JSON.parse(storedAccessRaw) as TripAccess) : null
+      let storedAccess: TripAccess | null = null
+
+      if (storedAccessRaw) {
+        try {
+          storedAccess = JSON.parse(storedAccessRaw) as TripAccess
+        } catch {
+          window.localStorage.removeItem(getTripAccessKey(tripId))
+        }
+      }
+
       const matchedParticipant = storedAccess
         ? nextParticipants.find((participant) => participant.id === storedAccess.responseId)
         : null
@@ -101,6 +120,7 @@ export default function EventPage() {
         setCurrentUserId(null)
         setHasSubmitted(false)
         setSavedEditCode(null)
+        setEditingParticipant(null)
         setSelectedParticipantId(nextParticipants[0]?.id ?? null)
       }
     } catch (error) {
@@ -144,21 +164,13 @@ export default function EventPage() {
         body: JSON.stringify(payload),
       })
 
-      const data = (await response.json()) as { response?: ResponseRecord; error?: string }
+      const data = (await response.json()) as SaveResponsePayload
 
       if (!response.ok || !data.response) {
         throw new Error(data.error || 'Unable to update response.')
       }
 
-      const updatedParticipant = responseToParticipant(data.response)
-
-      setParticipants((prev) =>
-        prev.map((participant) =>
-          participant.id === editingParticipant.id ? updatedParticipant : participant,
-        ),
-      )
-      setSelectedParticipantId(editingParticipant.id)
-      setCurrentUserId(editingParticipant.id)
+      await loadTrip()
       setSavedEditCode(data.response.editCode)
     } else {
       const response = await fetch(`/api/trips/${tripId}/responses`, {
@@ -169,7 +181,7 @@ export default function EventPage() {
         body: JSON.stringify(payload),
       })
 
-      const data = (await response.json()) as { response?: ResponseRecord; error?: string }
+      const data = (await response.json()) as SaveResponsePayload
 
       if (!response.ok || !data.response) {
         throw new Error(data.error || 'Unable to save response.')
@@ -184,15 +196,14 @@ export default function EventPage() {
       window.localStorage.setItem(getTripAccessKey(tripId), JSON.stringify(nextAccess))
 
       setTripAccess(nextAccess)
-      setParticipants((prev) => [...prev, newParticipant])
-      setSelectedParticipantId(newParticipant.id)
       setCurrentUserId(newParticipant.id)
       setSavedEditCode(data.response.editCode)
+      await loadTrip()
     }
     
     setHasSubmitted(true)
     setEditingParticipant(null)
-  }, [editingParticipant, tripAccess, tripId])
+  }, [editingParticipant, loadTrip, tripAccess, tripId])
 
   // Start editing a submission
   const handleEditSubmission = useCallback((participantId: string) => {
@@ -205,14 +216,8 @@ export default function EventPage() {
 
   // Reset to view mode (after submission)
   const handleViewCalendar = useCallback(() => {
-    // Keep hasSubmitted true but allow viewing
-  }, [])
-
-  // Start a new submission (clear edit state)
-  const handleNewSubmission = useCallback(() => {
-    setEditingParticipant(null)
-    setHasSubmitted(false)
-  }, [])
+    setSelectedParticipantId((current) => current ?? participants[0]?.id ?? null)
+  }, [participants])
 
   const shareUrl = useMemo(() => {
     if (typeof window === 'undefined') {
@@ -247,6 +252,12 @@ export default function EventPage() {
           <div className="rounded-2xl border border-border/60 bg-card p-10 text-center shadow-sm">
             <h1 className="text-2xl font-semibold text-foreground mb-2">Trip not found</h1>
             <p className="text-sm text-muted-foreground">{loadError || 'This trip link does not exist.'}</p>
+            <button
+              onClick={() => void loadTrip()}
+              className="mt-6 inline-flex rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
+            >
+              Retry
+            </button>
           </div>
         </div>
       </div>

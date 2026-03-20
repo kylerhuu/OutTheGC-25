@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { X, Plane } from "lucide-react"
 import type { TripRecord } from "@/lib/trip-types"
 
@@ -18,6 +18,9 @@ export function CreateTripModal({ open, onClose }: CreateTripModalProps) {
   const [link, setLink] = useState("")
   const [isGenerating, setIsGenerating] = useState(false)
   const [errorMessage, setErrorMessage] = useState("")
+  const [copyState, setCopyState] = useState<"idle" | "copied" | "error">("idle")
+
+  const today = useMemo(() => new Date().toISOString().split("T")[0], [])
 
   if (!open) return null
 
@@ -25,6 +28,13 @@ export function CreateTripModal({ open, onClose }: CreateTripModalProps) {
     e.preventDefault()
     setIsGenerating(true)
     setErrorMessage("")
+    setCopyState("idle")
+
+    if (startDate && endDate && startDate > endDate) {
+      setErrorMessage("End date must be the same day or after the start date.")
+      setIsGenerating(false)
+      return
+    }
 
     try {
       const response = await fetch("/api/trips", {
@@ -65,7 +75,18 @@ export function CreateTripModal({ open, onClose }: CreateTripModalProps) {
     setLink("")
     setErrorMessage("")
     setIsGenerating(false)
+    setCopyState("idle")
     onClose()
+  }
+
+  async function handleCopyLink() {
+    try {
+      await navigator.clipboard.writeText(link)
+      setCopyState("copied")
+      window.setTimeout(() => setCopyState("idle"), 2000)
+    } catch {
+      setCopyState("error")
+    }
   }
 
   return (
@@ -127,6 +148,7 @@ export function CreateTripModal({ open, onClose }: CreateTripModalProps) {
                     aria-label="Start date"
                     value={startDate}
                     onChange={(e) => setStartDate(e.target.value)}
+                    min={today}
                     className="flex-1 border border-border rounded-xl px-4 py-2.5 text-sm bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition"
                   />
                   <input
@@ -135,6 +157,7 @@ export function CreateTripModal({ open, onClose }: CreateTripModalProps) {
                     aria-label="End date"
                     value={endDate}
                     onChange={(e) => setEndDate(e.target.value)}
+                    min={startDate || today}
                     className="flex-1 border border-border rounded-xl px-4 py-2.5 text-sm bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition"
                   />
                 </div>
@@ -182,12 +205,15 @@ export function CreateTripModal({ open, onClose }: CreateTripModalProps) {
             <div className="w-full bg-muted rounded-xl px-4 py-3 flex items-center justify-between gap-3">
               <span className="text-sm text-foreground font-mono truncate">{link}</span>
               <button
-                onClick={() => navigator.clipboard.writeText(link)}
+                onClick={handleCopyLink}
                 className="text-xs font-semibold text-primary whitespace-nowrap hover:opacity-80 transition"
               >
-                Copy
+                {copyState === "copied" ? "Copied" : "Copy"}
               </button>
             </div>
+            {copyState === "error" && (
+              <p className="text-sm text-destructive">Couldn&apos;t copy automatically. You can still copy the link manually.</p>
+            )}
             <button
               onClick={handleClose}
               className="w-full bg-primary text-primary-foreground rounded-xl py-3 text-sm font-semibold hover:opacity-90 active:scale-[0.98] transition-all"

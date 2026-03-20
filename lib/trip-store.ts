@@ -20,8 +20,28 @@ function generateEditCode() {
   return generateId(8)
 }
 
+function normalizeDate(value: string) {
+  const normalized = new Date(value)
+
+  if (Number.isNaN(normalized.getTime())) {
+    throw new Error('Invalid date provided.')
+  }
+
+  return normalized
+}
+
 function serializeList(items: string[] | undefined) {
   return JSON.stringify(items || [])
+}
+
+function normalizeList(items: string[] | undefined) {
+  return Array.from(
+    new Set(
+      (items || [])
+        .map((item) => item.trim())
+        .filter(Boolean),
+    ),
+  )
 }
 
 function deserializeList(value: unknown) {
@@ -197,7 +217,10 @@ export async function createTrip(input: CreateTripInput): Promise<TripRecord> {
     throw new Error('Trip date range is required.')
   }
 
-  if (new Date(input.startDate) > new Date(input.endDate)) {
+  const startDate = normalizeDate(input.startDate)
+  const endDate = normalizeDate(input.endDate)
+
+  if (startDate > endDate) {
     throw new Error('Start date must be before end date.')
   }
 
@@ -241,7 +264,11 @@ export async function createResponse(tripId: string, input: CreateResponseInput)
   await ensureDbReady()
   const trip = await prisma.trip.findUnique({
     where: { id: tripId },
-    select: { id: true },
+    select: {
+      id: true,
+      startDate: true,
+      endDate: true,
+    },
   })
 
   if (!trip) {
@@ -253,6 +280,28 @@ export async function createResponse(tripId: string, input: CreateResponseInput)
     throw new Error('Name is required.')
   }
 
+  const destinations = normalizeList(input.destinations)
+  const interests = normalizeList(input.interests)
+  const tripStart = normalizeDate(trip.startDate)
+  const tripEnd = normalizeDate(trip.endDate)
+
+  if ((input.availabilityStart && !input.availabilityEnd) || (!input.availabilityStart && input.availabilityEnd)) {
+    throw new Error('Please select a complete availability range.')
+  }
+
+  if (input.availabilityStart && input.availabilityEnd) {
+    const availabilityStart = normalizeDate(input.availabilityStart)
+    const availabilityEnd = normalizeDate(input.availabilityEnd)
+
+    if (availabilityStart > availabilityEnd) {
+      throw new Error('Availability start must be before availability end.')
+    }
+
+    if (availabilityStart < tripStart || availabilityEnd > tripEnd) {
+      throw new Error('Availability must stay within the trip date range.')
+    }
+  }
+
   const response = await prisma.tripResponse.create({
     data: {
       id: generateId(10),
@@ -261,9 +310,9 @@ export async function createResponse(tripId: string, input: CreateResponseInput)
       editCode: input.editCode?.trim() || generateEditCode(),
       availabilityStart: input.availabilityStart || null,
       availabilityEnd: input.availabilityEnd || null,
-      destinations: serializeList(input.destinations),
+      destinations: serializeList(destinations),
       budget: input.budget || '',
-      interests: serializeList(input.interests),
+      interests: serializeList(interests),
       notes: input.notes?.trim() || '',
     },
   })
@@ -294,6 +343,40 @@ export async function updateResponse(
     throw new Error('Invalid edit code.')
   }
 
+  const trip = await prisma.trip.findUnique({
+    where: { id: tripId },
+    select: {
+      startDate: true,
+      endDate: true,
+    },
+  })
+
+  if (!trip) {
+    throw new Error('Trip not found.')
+  }
+
+  const destinations = normalizeList(input.destinations)
+  const interests = normalizeList(input.interests)
+  const tripStart = normalizeDate(trip.startDate)
+  const tripEnd = normalizeDate(trip.endDate)
+
+  if ((input.availabilityStart && !input.availabilityEnd) || (!input.availabilityStart && input.availabilityEnd)) {
+    throw new Error('Please select a complete availability range.')
+  }
+
+  if (input.availabilityStart && input.availabilityEnd) {
+    const availabilityStart = normalizeDate(input.availabilityStart)
+    const availabilityEnd = normalizeDate(input.availabilityEnd)
+
+    if (availabilityStart > availabilityEnd) {
+      throw new Error('Availability start must be before availability end.')
+    }
+
+    if (availabilityStart < tripStart || availabilityEnd > tripEnd) {
+      throw new Error('Availability must stay within the trip date range.')
+    }
+  }
+
   const response = await prisma.tripResponse.update({
     where: {
       id: responseId,
@@ -301,9 +384,9 @@ export async function updateResponse(
     data: {
       availabilityStart: input.availabilityStart || null,
       availabilityEnd: input.availabilityEnd || null,
-      destinations: serializeList(input.destinations),
+      destinations: serializeList(destinations),
       budget: input.budget || '',
-      interests: serializeList(input.interests),
+      interests: serializeList(interests),
       notes: input.notes?.trim() || '',
     },
   })
