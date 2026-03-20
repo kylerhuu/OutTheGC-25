@@ -4,26 +4,31 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { Slider } from '@/components/ui/slider'
-import { Calendar, MapPin, DollarSign, Heart, Users } from 'lucide-react'
-
-interface ParticipantData {
-  name: string
-  availability: { from: Date; to: Date } | null
-  destinations: string[]
-  budget: string
-  interests: string[]
-}
+import { MapPin, DollarSign, Heart, Users } from 'lucide-react'
+import { AvailabilityHeatmap } from '@/components/tripsync/availability-heatmap'
+import { ParticipantDetails } from '@/components/tripsync/participant-details'
+import type { ParticipantData } from '@/app/event/[tripId]/page'
 
 interface EventSummaryPanelProps {
   participants: ParticipantData[]
   tripDuration: number
   onDurationChange: (duration: number) => void
+  tripDateRange: { from: Date; to: Date }
+  selectedParticipantId: string | null
+  onSelectParticipant: (id: string | null) => void
+  currentUserId: string | null
+  onEditParticipant: (id: string) => void
 }
 
 export function EventSummaryPanel({ 
   participants, 
   tripDuration, 
-  onDurationChange 
+  onDurationChange,
+  tripDateRange,
+  selectedParticipantId,
+  onSelectParticipant,
+  currentUserId,
+  onEditParticipant
 }: EventSummaryPanelProps) {
   // Aggregate data
   const destinationCounts = participants.reduce((acc, p) => {
@@ -55,32 +60,6 @@ export function EventSummaryPanel({
     .sort(([, a], [, b]) => b - a)
     .slice(0, 6)
 
-  // Find overlapping availability windows
-  const availabilities = participants
-    .filter(p => p.availability)
-    .map(p => p.availability!)
-
-  const findBestWindows = () => {
-    if (availabilities.length === 0) return []
-    
-    // Find the range where all participants overlap
-    const latestStart = new Date(Math.max(...availabilities.map(a => a.from.getTime())))
-    const earliestEnd = new Date(Math.min(...availabilities.map(a => a.to.getTime())))
-    
-    if (latestStart <= earliestEnd) {
-      const daysDiff = Math.ceil((earliestEnd.getTime() - latestStart.getTime()) / (1000 * 60 * 60 * 24)) + 1
-      return [{
-        from: latestStart,
-        to: earliestEnd,
-        participants: availabilities.length,
-        days: daysDiff
-      }]
-    }
-    
-    return []
-  }
-
-  const bestWindows = findBestWindows()
   const totalParticipants = participants.length
 
   const budgetLabels: Record<string, string> = {
@@ -101,13 +80,13 @@ export function EventSummaryPanel({
     nature: 'Nature',
   }
 
-  const formatDate = (date: Date) => {
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-  }
+  const selectedParticipant = selectedParticipantId 
+    ? participants.find(p => p.id === selectedParticipantId)
+    : null
 
   return (
     <div className="flex flex-col gap-5">
-      {/* Participants */}
+      {/* Clickable Participants */}
       <Card className="bg-card border-border/60 shadow-sm">
         <CardHeader className="pb-3.5">
           <CardTitle className="text-sm font-semibold flex items-center gap-2 text-foreground">
@@ -120,53 +99,40 @@ export function EventSummaryPanel({
             <p className="text-xs text-muted-foreground">No responses yet</p>
           ) : (
             <div className="flex flex-wrap gap-2">
-              {participants.map((p, i) => (
-                <Badge key={i} variant="secondary" className="text-xs font-medium">{p.name}</Badge>
+              {participants.map((p) => (
+                <Badge 
+                  key={p.id} 
+                  variant={selectedParticipantId === p.id ? 'default' : 'secondary'}
+                  className={`text-xs font-medium cursor-pointer transition-all ${
+                    selectedParticipantId === p.id 
+                      ? 'bg-primary text-primary-foreground ring-2 ring-primary/30' 
+                      : 'hover:bg-secondary/80'
+                  } ${currentUserId === p.id ? 'ring-1 ring-primary/50' : ''}`}
+                  onClick={() => onSelectParticipant(p.id)}
+                >
+                  {p.name}
+                  {currentUserId === p.id && ' (You)'}
+                </Badge>
               ))}
             </div>
           )}
         </CardContent>
       </Card>
 
-      {/* Best Time Windows */}
-      <Card className="bg-gradient-to-b from-primary/5 to-card border-primary/20 shadow-sm">
-        <CardHeader className="pb-3.5">
-          <CardTitle className="text-sm font-semibold flex items-center gap-2 text-foreground">
-            <Calendar className="size-4 text-primary" />
-            Best Time Windows
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="pt-0">
-          {bestWindows.length === 0 ? (
-            <p className="text-xs text-muted-foreground">
-              {availabilities.length === 0 
-                ? 'Waiting for availability responses' 
-                : 'No overlapping availability found'}
-            </p>
-          ) : (
-            <div className="flex flex-col gap-3">
-              {bestWindows.map((window, i) => (
-                <div key={i} className="flex flex-col gap-2">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs font-semibold text-foreground">
-                      {formatDate(window.from)} – {formatDate(window.to)}
-                    </span>
-                    <Badge variant="outline" className="text-xs font-medium bg-primary/10 text-primary border-primary/20">
-                      {window.days} days
-                    </Badge>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Progress value={(window.participants / totalParticipants) * 100} className="flex-1 h-2 rounded-full" />
-                    <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">
-                      {window.participants}/{totalParticipants}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      {/* Participant Details (when selected) */}
+      {selectedParticipant && (
+        <ParticipantDetails
+          participant={selectedParticipant}
+          isCurrentUser={currentUserId === selectedParticipant.id}
+          onEdit={currentUserId === selectedParticipant.id ? () => onEditParticipant(selectedParticipant.id) : undefined}
+        />
+      )}
+
+      {/* Group Availability Heatmap */}
+      <AvailabilityHeatmap
+        participants={participants}
+        tripDateRange={tripDateRange}
+      />
 
       {/* Trip Duration */}
       <Card className="bg-card border-border/60 shadow-sm">
