@@ -1,9 +1,8 @@
 'use client'
 
-import { useState } from 'react'
-import { Copy, Check, Calendar } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { Calendar } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
+import { CopyButton } from '@/components/tripsync/copy-button'
 
 interface EventTopBarProps {
   tripName: string
@@ -13,14 +12,6 @@ interface EventTopBarProps {
 }
 
 export function EventTopBar({ tripName, dateRange, responseCount, shareUrl }: EventTopBarProps) {
-  const [copied, setCopied] = useState(false)
-
-  const handleCopy = async () => {
-    await navigator.clipboard.writeText(shareUrl)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-  }
-
   return (
     <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between border-b border-border/50 bg-gradient-to-b from-card/80 to-card/40 px-8 py-6 rounded-xl">
       <div className="flex flex-col gap-2">
@@ -36,23 +27,7 @@ export function EventTopBar({ tripName, dateRange, responseCount, shareUrl }: Ev
         </div>
       </div>
       
-      <Button
-        onClick={handleCopy}
-        size="sm"
-        className="w-fit gap-2 bg-primary hover:bg-primary/90 text-primary-foreground font-medium"
-      >
-        {copied ? (
-          <>
-            <Check className="size-4" />
-            Copied!
-          </>
-        ) : (
-          <>
-            <Copy className="size-4" />
-            Copy Link
-          </>
-        )}
-      </Button>
+      <CopyButton textToCopy={shareUrl} />
     </header>
   )
 }

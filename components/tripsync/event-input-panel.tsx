@@ -1,14 +1,15 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { DateRange } from 'react-day-picker'
-import { Plus, X } from 'lucide-react'
+import { Plus, X, Eye, Pencil } from 'lucide-react'
 import { Calendar } from '@/components/ui/calendar'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Toggle } from '@/components/ui/toggle'
+import { Textarea } from '@/components/ui/textarea'
 import {
   Select,
   SelectContent,
@@ -18,6 +19,7 @@ import {
 } from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
 import { Spinner } from '@/components/ui/spinner'
+import type { ParticipantData } from '@/app/event/[tripId]/page'
 
 const DESTINATION_SUGGESTIONS = [
   'Barcelona', 'Lisbon', 'Tokyo', 'Bali', 'Iceland', 'Costa Rica', 'Portugal', 'Greece'
@@ -47,26 +49,67 @@ interface UserInput {
   destinations: string[]
   budget: string
   interests: string[]
+  notes?: string
+  editCode?: string
 }
 
 interface EventInputPanelProps {
   tripDateRange: { from: Date; to: Date }
   onSubmit: (input: UserInput) => void
   hasSubmitted?: boolean
+  editingParticipant?: ParticipantData | null
+  onEditSubmission?: () => void
+  onViewCalendar?: () => void
 }
 
-export function EventInputPanel({ tripDateRange, onSubmit, hasSubmitted = false }: EventInputPanelProps) {
+export function EventInputPanel({ 
+  tripDateRange, 
+  onSubmit, 
+  hasSubmitted = false,
+  editingParticipant,
+  onEditSubmission,
+  onViewCalendar
+}: EventInputPanelProps) {
   const [name, setName] = useState('')
   const [availability, setAvailability] = useState<DateRange | undefined>(undefined)
   const [destinations, setDestinations] = useState<string[]>([])
   const [customDestination, setCustomDestination] = useState('')
   const [budget, setBudget] = useState('')
   const [interests, setInterests] = useState<string[]>([])
+  const [notes, setNotes] = useState('')
+  const [editCode, setEditCode] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
+  // Populate form when editing
+  useEffect(() => {
+    if (editingParticipant) {
+      setName(editingParticipant.name)
+      setAvailability(
+        editingParticipant.availability 
+          ? { from: editingParticipant.availability.from, to: editingParticipant.availability.to }
+          : undefined
+      )
+      setDestinations(editingParticipant.destinations)
+      setBudget(editingParticipant.budget)
+      setInterests(editingParticipant.interests)
+      setNotes(editingParticipant.notes || '')
+      setEditCode(editingParticipant.editCode || '')
+    } else {
+      // Reset form
+      setName('')
+      setAvailability(undefined)
+      setDestinations([])
+      setBudget('')
+      setInterests([])
+      setNotes('')
+      setEditCode('')
+    }
+  }, [editingParticipant])
+
   const addDestination = (dest: string) => {
-    if (dest && !destinations.includes(dest)) {
-      setDestinations([...destinations, dest])
+    const trimmed = dest.trim()
+    if (trimmed && !destinations.includes(trimmed)) {
+      setDestinations([...destinations, trimmed])
     }
     setCustomDestination('')
   }
@@ -96,35 +139,70 @@ export function EventInputPanel({ tripDateRange, onSubmit, hasSubmitted = false 
       destinations,
       budget,
       interests,
+      notes,
+      editCode: editCode || undefined,
     })
     setIsSubmitting(false)
   }
 
   const isValid = name.trim().length > 0
 
-  if (hasSubmitted) {
+  // Post-submission state with action buttons
+  if (hasSubmitted && !editingParticipant) {
     return (
       <Card className="bg-gradient-to-b from-primary/5 to-card border-primary/20">
-        <CardContent className="flex flex-col items-center justify-center py-16 text-center">
+        <CardContent className="flex flex-col items-center justify-center py-12 text-center">
           <div className="size-14 rounded-full bg-primary/15 flex items-center justify-center mb-5">
             <svg className="size-7 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
             </svg>
           </div>
           <h3 className="text-lg font-semibold text-foreground mb-2">Response Submitted</h3>
-          <p className="text-muted-foreground text-sm max-w-xs">
+          <p className="text-muted-foreground text-sm max-w-xs mb-6">
             Thanks for sharing! Your preferences are helping plan the perfect trip.
           </p>
+          
+          <div className="flex flex-col sm:flex-row gap-3 w-full max-w-sm">
+            {onEditSubmission && (
+              <Button
+                variant="outline"
+                onClick={onEditSubmission}
+                className="flex-1 gap-2"
+              >
+                <Pencil className="size-4" />
+                Edit My Submission
+              </Button>
+            )}
+            {onViewCalendar && (
+              <Button
+                variant="default"
+                onClick={onViewCalendar}
+                className="flex-1 gap-2"
+              >
+                <Eye className="size-4" />
+                View Calendar
+              </Button>
+            )}
+          </div>
         </CardContent>
       </Card>
     )
   }
 
+  const isEditMode = !!editingParticipant
+
   return (
     <Card className="bg-card border-border/60 shadow-sm">
       <CardHeader className="pb-6">
-        <CardTitle className="text-2xl font-semibold">Share Your Preferences</CardTitle>
-        <CardDescription className="text-sm text-muted-foreground">Tell us when you're available and what you'd like to do</CardDescription>
+        <CardTitle className="text-2xl font-semibold">
+          {isEditMode ? 'Edit Your Response' : 'Share Your Preferences'}
+        </CardTitle>
+        <CardDescription className="text-sm text-muted-foreground">
+          {isEditMode 
+            ? 'Update your availability and preferences below'
+            : 'Tell us when you\'re available and what you\'d like to do'
+          }
+        </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-8">
         {/* Name */}
@@ -136,8 +214,31 @@ export function EventInputPanel({ tripDateRange, onSubmit, hasSubmitted = false 
             value={name}
             onChange={(e) => setName(e.target.value)}
             className="h-10 text-base"
+            disabled={isEditMode}
           />
+          {isEditMode && (
+            <p className="text-xs text-muted-foreground">Name cannot be changed when editing</p>
+          )}
         </div>
+
+        {/* Edit Code (only for new submissions) */}
+        {!isEditMode && (
+          <div className="flex flex-col gap-3">
+            <Label htmlFor="editCode" className="text-sm font-medium">
+              Edit Code <span className="text-muted-foreground font-normal">(optional)</span>
+            </Label>
+            <Input
+              id="editCode"
+              placeholder="Create a code to edit your response later"
+              value={editCode}
+              onChange={(e) => setEditCode(e.target.value)}
+              className="h-10 text-base"
+            />
+            <p className="text-xs text-muted-foreground">
+              Remember this code to edit your submission later
+            </p>
+          </div>
+        )}
 
         {/* Availability Calendar */}
         <div className="flex flex-col gap-3 pt-2">
@@ -190,15 +291,23 @@ export function EventInputPanel({ tripDateRange, onSubmit, hasSubmitted = false 
               </Badge>
             ))}
           </div>
+          
+          {/* Custom destination input - always visible */}
           <div className="flex gap-2 mt-1">
             <Input
               placeholder="Add custom destination"
               value={customDestination}
               onChange={(e) => setCustomDestination(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && addDestination(customDestination)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  addDestination(customDestination)
+                }
+              }}
               className="flex-1 h-9 text-sm"
             />
             <Button
+              type="button"
               size="sm"
               onClick={() => addDestination(customDestination)}
               disabled={!customDestination.trim()}
@@ -208,6 +317,23 @@ export function EventInputPanel({ tripDateRange, onSubmit, hasSubmitted = false 
               Add
             </Button>
           </div>
+
+          {/* Show custom destinations that aren't in suggestions */}
+          {destinations.filter(d => !DESTINATION_SUGGESTIONS.includes(d)).length > 0 && (
+            <div className="flex flex-wrap gap-2 mt-2">
+              {destinations.filter(d => !DESTINATION_SUGGESTIONS.includes(d)).map(dest => (
+                <Badge
+                  key={dest}
+                  variant="default"
+                  className="cursor-pointer transition-all text-xs font-medium py-1 px-3 bg-primary text-primary-foreground border-primary"
+                  onClick={() => removeDestination(dest)}
+                >
+                  {dest}
+                  <X className="size-3 ml-1.5" />
+                </Badge>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Budget */}
@@ -250,6 +376,20 @@ export function EventInputPanel({ tripDateRange, onSubmit, hasSubmitted = false 
           </div>
         </div>
 
+        {/* Notes */}
+        <div className="flex flex-col gap-3 pt-2">
+          <Label htmlFor="notes" className="text-sm font-medium">
+            Notes <span className="text-muted-foreground font-normal">(optional)</span>
+          </Label>
+          <Textarea
+            id="notes"
+            placeholder="Any additional preferences or constraints..."
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            className="min-h-[80px] text-base resize-none"
+          />
+        </div>
+
         {/* Submit */}
         <Button
           onClick={handleSubmit}
@@ -259,10 +399,10 @@ export function EventInputPanel({ tripDateRange, onSubmit, hasSubmitted = false 
           {isSubmitting ? (
             <>
               <Spinner className="size-4 mr-2" />
-              Submitting...
+              {isEditMode ? 'Updating...' : 'Submitting...'}
             </>
           ) : (
-            'Submit Response'
+            isEditMode ? 'Update Response' : 'Submit Response'
           )}
         </Button>
       </CardContent>
