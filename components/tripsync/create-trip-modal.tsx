@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { X, Plane } from "lucide-react"
+import type { TripRecord } from "@/lib/trip-types"
 
 interface CreateTripModalProps {
   open: boolean
@@ -15,15 +16,44 @@ export function CreateTripModal({ open, onClose }: CreateTripModalProps) {
   const [description, setDescription] = useState("")
   const [generated, setGenerated] = useState(false)
   const [link, setLink] = useState("")
+  const [isGenerating, setIsGenerating] = useState(false)
+  const [errorMessage, setErrorMessage] = useState("")
 
   if (!open) return null
 
-  function handleGenerate(e: React.FormEvent) {
+  async function handleGenerate(e: React.FormEvent) {
     e.preventDefault()
-    const id = Math.random().toString(36).slice(2, 12)
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://outthegc.app'
-    setLink(`${baseUrl}/event/${id}`)
-    setGenerated(true)
+    setIsGenerating(true)
+    setErrorMessage("")
+
+    try {
+      const response = await fetch("/api/trips", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: tripName,
+          description,
+          startDate,
+          endDate,
+        }),
+      })
+
+      const data = (await response.json()) as { trip?: TripRecord; error?: string }
+
+      if (!response.ok || !data.trip) {
+        throw new Error(data.error || "Unable to create trip.")
+      }
+
+      const origin = window.location.origin
+      setLink(`${origin}/event/${data.trip.id}`)
+      setGenerated(true)
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Unable to create trip.")
+    } finally {
+      setIsGenerating(false)
+    }
   }
 
   function handleClose() {
@@ -33,6 +63,8 @@ export function CreateTripModal({ open, onClose }: CreateTripModalProps) {
     setEndDate("")
     setDescription("")
     setLink("")
+    setErrorMessage("")
+    setIsGenerating(false)
     onClose()
   }
 
@@ -125,10 +157,15 @@ export function CreateTripModal({ open, onClose }: CreateTripModalProps) {
 
               <button
                 type="submit"
+                disabled={isGenerating}
                 className="w-full bg-primary text-primary-foreground rounded-xl py-3 text-sm font-semibold hover:opacity-90 active:scale-[0.98] transition-all"
               >
-                Generate Link
+                {isGenerating ? "Creating..." : "Generate Link"}
               </button>
+
+              {errorMessage && (
+                <p className="text-sm text-destructive">{errorMessage}</p>
+              )}
             </form>
           </>
         ) : (

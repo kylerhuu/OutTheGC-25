@@ -55,11 +55,12 @@ interface UserInput {
 
 interface EventInputPanelProps {
   tripDateRange: { from: Date; to: Date }
-  onSubmit: (input: UserInput) => void
+  onSubmit: (input: UserInput) => Promise<void>
   hasSubmitted?: boolean
   editingParticipant?: ParticipantData | null
   onEditSubmission?: () => void
   onViewCalendar?: () => void
+  savedEditCode?: string | null
 }
 
 export function EventInputPanel({ 
@@ -68,7 +69,8 @@ export function EventInputPanel({
   hasSubmitted = false,
   editingParticipant,
   onEditSubmission,
-  onViewCalendar
+  onViewCalendar,
+  savedEditCode,
 }: EventInputPanelProps) {
   const [name, setName] = useState('')
   const [availability, setAvailability] = useState<DateRange | undefined>(undefined)
@@ -79,6 +81,7 @@ export function EventInputPanel({
   const [notes, setNotes] = useState('')
   const [editCode, setEditCode] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState('')
 
   // Populate form when editing
   useEffect(() => {
@@ -104,6 +107,7 @@ export function EventInputPanel({
       setNotes('')
       setEditCode('')
     }
+    setSubmitError('')
   }, [editingParticipant])
 
   const addDestination = (dest: string) => {
@@ -130,19 +134,23 @@ export function EventInputPanel({
     if (!name.trim()) return
     
     setIsSubmitting(true)
-    // Simulate network delay
-    await new Promise(resolve => setTimeout(resolve, 800))
-    
-    onSubmit({
-      name,
-      availability,
-      destinations,
-      budget,
-      interests,
-      notes,
-      editCode: editCode || undefined,
-    })
-    setIsSubmitting(false)
+    setSubmitError('')
+
+    try {
+      await onSubmit({
+        name,
+        availability,
+        destinations,
+        budget,
+        interests,
+        notes,
+        editCode: editCode || undefined,
+      })
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : 'Unable to save your response.')
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   const isValid = name.trim().length > 0
@@ -161,6 +169,13 @@ export function EventInputPanel({
           <p className="text-muted-foreground text-sm max-w-xs mb-6">
             Thanks for sharing! Your preferences are helping plan the perfect trip.
           </p>
+
+          {savedEditCode && (
+            <div className="w-full max-w-sm rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 text-left mb-6">
+              <p className="text-xs font-medium text-muted-foreground mb-1">Your edit code</p>
+              <p className="font-mono text-sm text-foreground break-all">{savedEditCode}</p>
+            </div>
+          )}
           
           <div className="flex flex-col sm:flex-row gap-3 w-full max-w-sm">
             {onEditSubmission && (
@@ -405,6 +420,10 @@ export function EventInputPanel({
             isEditMode ? 'Update Response' : 'Submit Response'
           )}
         </Button>
+
+        {submitError && (
+          <p className="text-sm text-destructive">{submitError}</p>
+        )}
       </CardContent>
     </Card>
   )

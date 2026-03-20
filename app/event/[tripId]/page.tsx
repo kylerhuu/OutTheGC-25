@@ -1,66 +1,12 @@
 'use client'
 
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useEffect } from 'react'
 import { useParams } from 'next/navigation'
+import type { DateRange } from 'react-day-picker'
 import { EventTopBar } from '@/components/tripsync/event-top-bar'
 import { EventInputPanel } from '@/components/tripsync/event-input-panel'
 import { EventSummaryPanel } from '@/components/tripsync/event-summary-panel'
-
-// Generate unique ID for participants
-function generateId() {
-  return Math.random().toString(36).substring(2, 9)
-}
-
-function generateMockTrip(tripId: string) {
-  // Generate consistent mock data based on tripId
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://outthegc.app'
-  return {
-    id: tripId,
-    name: `Trip: ${tripId}`,
-    dateRange: {
-      from: new Date(2026, 5, 15), // June 15, 2026
-      to: new Date(2026, 6, 15),   // July 15, 2026
-    },
-    shareUrl: `${baseUrl}/event/${tripId}`,
-  }
-}
-
-// Enhanced mock participants with IDs, passwords, and notes
-const MOCK_PARTICIPANTS: ParticipantData[] = [
-  {
-    id: 'alex001',
-    name: 'Alex',
-    editCode: 'alex123',
-    availability: { from: new Date(2026, 5, 20), to: new Date(2026, 6, 5) },
-    destinations: ['Barcelona', 'Lisbon', 'Portugal'],
-    budget: 'moderate',
-    interests: ['beach', 'food', 'culture'],
-    notes: 'Prefer warm weather destinations',
-    submittedAt: new Date(2026, 4, 1),
-  },
-  {
-    id: 'jordan002',
-    name: 'Jordan',
-    editCode: 'jordan123',
-    availability: { from: new Date(2026, 5, 18), to: new Date(2026, 6, 8) },
-    destinations: ['Barcelona', 'Greece', 'Iceland'],
-    budget: 'comfortable',
-    interests: ['adventure', 'nature', 'food'],
-    notes: '',
-    submittedAt: new Date(2026, 4, 2),
-  },
-  {
-    id: 'sam003',
-    name: 'Sam',
-    editCode: 'sam123',
-    availability: { from: new Date(2026, 5, 22), to: new Date(2026, 6, 10) },
-    destinations: ['Lisbon', 'Barcelona', 'Costa Rica'],
-    budget: 'moderate',
-    interests: ['beach', 'nightlife', 'city'],
-    notes: 'Flexible on dates if needed',
-    submittedAt: new Date(2026, 4, 3),
-  },
-]
+import type { CreateResponseInput, ResponseRecord, TripWithResponses } from '@/lib/trip-types'
 
 export interface ParticipantData {
   id: string
@@ -74,71 +20,179 @@ export interface ParticipantData {
   submittedAt: Date
 }
 
+interface TripAccess {
+  responseId: string
+  editCode: string
+}
+
+function getTripAccessKey(tripId: string) {
+  return `outthegc:trip-access:${tripId}`
+}
+
+function responseToParticipant(response: ResponseRecord): ParticipantData {
+  return {
+    id: response.id,
+    name: response.name,
+    editCode: response.editCode,
+    availability:
+      response.availabilityStart && response.availabilityEnd
+        ? {
+            from: new Date(response.availabilityStart),
+            to: new Date(response.availabilityEnd),
+          }
+        : null,
+    destinations: response.destinations,
+    budget: response.budget,
+    interests: response.interests,
+    notes: response.notes,
+    submittedAt: new Date(response.submittedAt),
+  }
+}
+
 export default function EventPage() {
   const params = useParams()
   const tripId = params.tripId as string
-  const mockTrip = useMemo(() => generateMockTrip(tripId), [tripId])
-  
-  const [participants, setParticipants] = useState<ParticipantData[]>(MOCK_PARTICIPANTS)
+  const [trip, setTrip] = useState<TripWithResponses | null>(null)
+  const [participants, setParticipants] = useState<ParticipantData[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+  const [tripAccess, setTripAccess] = useState<TripAccess | null>(null)
   const [hasSubmitted, setHasSubmitted] = useState(false)
   const [tripDuration, setTripDuration] = useState(7)
-  const [selectedParticipantId, setSelectedParticipantId] = useState<string | null>(
-    MOCK_PARTICIPANTS[0]?.id ?? null
-  )
+  const [selectedParticipantId, setSelectedParticipantId] = useState<string | null>(null)
   const [editingParticipant, setEditingParticipant] = useState<ParticipantData | null>(null)
+  const [savedEditCode, setSavedEditCode] = useState<string | null>(null)
+
+  const loadTrip = useCallback(async () => {
+    setIsLoading(true)
+    setLoadError(null)
+
+    try {
+      const response = await fetch(`/api/trips/${tripId}`, { cache: 'no-store' })
+      const data = (await response.json()) as { trip?: TripWithResponses; error?: string }
+
+      if (!response.ok || !data.trip) {
+        throw new Error(data.error || 'Unable to load trip.')
+      }
+
+      setTrip(data.trip)
+
+      const nextParticipants = data.trip.responses.map(responseToParticipant)
+      setParticipants(nextParticipants)
+
+      const storedAccessRaw = window.localStorage.getItem(getTripAccessKey(tripId))
+      const storedAccess = storedAccessRaw ? (JSON.parse(storedAccessRaw) as TripAccess) : null
+      const matchedParticipant = storedAccess
+        ? nextParticipants.find((participant) => participant.id === storedAccess.responseId)
+        : null
+
+      if (matchedParticipant && storedAccess) {
+        setTripAccess(storedAccess)
+        setCurrentUserId(matchedParticipant.id)
+        setHasSubmitted(true)
+        setSavedEditCode(storedAccess.editCode)
+        setSelectedParticipantId(matchedParticipant.id)
+      } else {
+        if (storedAccessRaw) {
+          window.localStorage.removeItem(getTripAccessKey(tripId))
+        }
+        setTripAccess(null)
+        setCurrentUserId(null)
+        setHasSubmitted(false)
+        setSavedEditCode(null)
+        setSelectedParticipantId(nextParticipants[0]?.id ?? null)
+      }
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : 'Unable to load trip.')
+    } finally {
+      setIsLoading(false)
+    }
+  }, [tripId])
+
+  useEffect(() => {
+    void loadTrip()
+  }, [loadTrip])
 
   // Handle new submission or update existing
-  const handleSubmit = useCallback((input: {
+  const handleSubmit = useCallback(async (input: {
     name: string
-    availability: { from: Date; to: Date } | undefined
+    availability: DateRange | undefined
     destinations: string[]
     budget: string
     interests: string[]
     notes?: string
     editCode?: string
   }) => {
-    if (editingParticipant) {
-      // Update existing participant
-      setParticipants(prev => prev.map(p => 
-        p.id === editingParticipant.id
-          ? {
-              ...p,
-              name: input.name,
-              availability: input.availability ? { from: input.availability.from!, to: input.availability.to! } : null,
-              destinations: input.destinations,
-              budget: input.budget,
-              interests: input.interests,
-              notes: input.notes || '',
-              submittedAt: new Date(),
-            }
-          : p
-      ))
+    const payload: CreateResponseInput = {
+      name: input.name,
+      availabilityStart: input.availability?.from?.toISOString() || null,
+      availabilityEnd: input.availability?.to?.toISOString() || null,
+      destinations: input.destinations,
+      budget: input.budget,
+      interests: input.interests,
+      notes: input.notes || '',
+      editCode: editingParticipant ? tripAccess?.editCode : input.editCode,
+    }
+
+    if (editingParticipant && tripAccess) {
+      const response = await fetch(`/api/trips/${tripId}/responses/${editingParticipant.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      })
+
+      const data = (await response.json()) as { response?: ResponseRecord; error?: string }
+
+      if (!response.ok || !data.response) {
+        throw new Error(data.error || 'Unable to update response.')
+      }
+
+      const updatedParticipant = responseToParticipant(data.response)
+
+      setParticipants((prev) =>
+        prev.map((participant) =>
+          participant.id === editingParticipant.id ? updatedParticipant : participant,
+        ),
+      )
       setSelectedParticipantId(editingParticipant.id)
       setCurrentUserId(editingParticipant.id)
+      setSavedEditCode(data.response.editCode)
     } else {
-      // Create new participant
-      const newId = generateId()
-      const newParticipant: ParticipantData = {
-        id: newId,
-        name: input.name,
-        editCode: input.editCode || generateId(),
-        availability: input.availability ? { from: input.availability.from!, to: input.availability.to! } : null,
-        destinations: input.destinations,
-        budget: input.budget,
-        interests: input.interests,
-        notes: input.notes || '',
-        submittedAt: new Date(),
+      const response = await fetch(`/api/trips/${tripId}/responses`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      })
+
+      const data = (await response.json()) as { response?: ResponseRecord; error?: string }
+
+      if (!response.ok || !data.response) {
+        throw new Error(data.error || 'Unable to save response.')
       }
-      
-      setParticipants(prev => [...prev, newParticipant])
-      setSelectedParticipantId(newId)
-      setCurrentUserId(newId)
+
+      const newParticipant = responseToParticipant(data.response)
+      const nextAccess = {
+        responseId: data.response.id,
+        editCode: data.response.editCode,
+      }
+
+      window.localStorage.setItem(getTripAccessKey(tripId), JSON.stringify(nextAccess))
+
+      setTripAccess(nextAccess)
+      setParticipants((prev) => [...prev, newParticipant])
+      setSelectedParticipantId(newParticipant.id)
+      setCurrentUserId(newParticipant.id)
+      setSavedEditCode(data.response.editCode)
     }
     
     setHasSubmitted(true)
     setEditingParticipant(null)
-  }, [editingParticipant])
+  }, [editingParticipant, tripAccess, tripId])
 
   // Start editing a submission
   const handleEditSubmission = useCallback((participantId: string) => {
@@ -160,9 +214,43 @@ export default function EventPage() {
     setHasSubmitted(false)
   }, [])
 
+  const shareUrl = useMemo(() => {
+    if (typeof window === 'undefined') {
+      return `${process.env.NEXT_PUBLIC_BASE_URL || 'https://outthegc.app'}/event/${tripId}`
+    }
+
+    return `${window.location.origin}/event/${tripId}`
+  }, [tripId])
+
   const formatDateRange = (from: Date, to: Date) => {
     const options: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric', year: 'numeric' }
     return `${from.toLocaleDateString('en-US', options)} - ${to.toLocaleDateString('en-US', options)}`
+  }
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <div className="mx-auto max-w-3xl px-4 py-16 sm:px-6 lg:px-8">
+          <div className="rounded-2xl border border-border/60 bg-card p-10 text-center shadow-sm">
+            <h1 className="text-2xl font-semibold text-foreground mb-2">Loading trip...</h1>
+            <p className="text-sm text-muted-foreground">Pulling in the latest responses.</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (loadError || !trip) {
+    return (
+      <div className="min-h-screen bg-background">
+        <div className="mx-auto max-w-3xl px-4 py-16 sm:px-6 lg:px-8">
+          <div className="rounded-2xl border border-border/60 bg-card p-10 text-center shadow-sm">
+            <h1 className="text-2xl font-semibold text-foreground mb-2">Trip not found</h1>
+            <p className="text-sm text-muted-foreground">{loadError || 'This trip link does not exist.'}</p>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -171,10 +259,10 @@ export default function EventPage() {
         <div className="flex flex-col gap-6">
           {/* Top Bar */}
           <EventTopBar
-            tripName={mockTrip.name}
-            dateRange={formatDateRange(mockTrip.dateRange.from, mockTrip.dateRange.to)}
+            tripName={trip.name}
+            dateRange={formatDateRange(new Date(trip.startDate), new Date(trip.endDate))}
             responseCount={participants.length}
-            shareUrl={mockTrip.shareUrl}
+            shareUrl={shareUrl}
           />
 
           {/* Main Content - Two Column Layout */}
@@ -182,12 +270,13 @@ export default function EventPage() {
             {/* Input Panel - 3/5 width on desktop */}
             <div className="lg:col-span-3">
               <EventInputPanel
-                tripDateRange={mockTrip.dateRange}
+                tripDateRange={{ from: new Date(trip.startDate), to: new Date(trip.endDate) }}
                 onSubmit={handleSubmit}
                 hasSubmitted={hasSubmitted}
                 editingParticipant={editingParticipant}
                 onEditSubmission={currentUserId ? () => handleEditSubmission(currentUserId) : undefined}
                 onViewCalendar={handleViewCalendar}
+                savedEditCode={savedEditCode}
               />
             </div>
 
@@ -197,7 +286,7 @@ export default function EventPage() {
                 participants={participants}
                 tripDuration={tripDuration}
                 onDurationChange={setTripDuration}
-                tripDateRange={mockTrip.dateRange}
+                tripDateRange={{ from: new Date(trip.startDate), to: new Date(trip.endDate) }}
                 selectedParticipantId={selectedParticipantId}
                 onSelectParticipant={setSelectedParticipantId}
                 currentUserId={currentUserId}
