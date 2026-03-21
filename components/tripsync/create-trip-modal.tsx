@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react"
 import { X, Plane } from "lucide-react"
+import { CopyButton } from "@/components/tripsync/copy-button"
 import type { TripRecord } from "@/lib/trip-types"
 
 interface CreateTripModalProps {
@@ -18,7 +19,6 @@ export function CreateTripModal({ open, onClose }: CreateTripModalProps) {
   const [link, setLink] = useState("")
   const [isGenerating, setIsGenerating] = useState(false)
   const [errorMessage, setErrorMessage] = useState("")
-  const [copyState, setCopyState] = useState<"idle" | "copied" | "error">("idle")
 
   const today = useMemo(() => new Date().toISOString().split("T")[0], [])
 
@@ -28,7 +28,6 @@ export function CreateTripModal({ open, onClose }: CreateTripModalProps) {
     e.preventDefault()
     setIsGenerating(true)
     setErrorMessage("")
-    setCopyState("idle")
 
     if (startDate && endDate && startDate > endDate) {
       setErrorMessage("End date must be the same day or after the start date.")
@@ -75,18 +74,7 @@ export function CreateTripModal({ open, onClose }: CreateTripModalProps) {
     setLink("")
     setErrorMessage("")
     setIsGenerating(false)
-    setCopyState("idle")
     onClose()
-  }
-
-  async function handleCopyLink() {
-    try {
-      await navigator.clipboard.writeText(link)
-      setCopyState("copied")
-      window.setTimeout(() => setCopyState("idle"), 2000)
-    } catch {
-      setCopyState("error")
-    }
   }
 
   return (
@@ -204,16 +192,8 @@ export function CreateTripModal({ open, onClose }: CreateTripModalProps) {
             </div>
             <div className="w-full bg-muted rounded-xl px-4 py-3 flex items-center justify-between gap-3">
               <span className="text-sm text-foreground font-mono truncate">{link}</span>
-              <button
-                onClick={handleCopyLink}
-                className="text-xs font-semibold text-primary whitespace-nowrap hover:opacity-80 transition"
-              >
-                {copyState === "copied" ? "Copied" : "Copy"}
-              </button>
+              <CopyButton textToCopy={link} className="h-8 px-3 py-0 text-xs" />
             </div>
-            {copyState === "error" && (
-              <p className="text-sm text-destructive">Couldn&apos;t copy automatically. You can still copy the link manually.</p>
-            )}
             <button
               onClick={handleClose}
               className="w-full bg-primary text-primary-foreground rounded-xl py-3 text-sm font-semibold hover:opacity-90 active:scale-[0.98] transition-all"

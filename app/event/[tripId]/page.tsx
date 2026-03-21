@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useCallback, useEffect } from 'react'
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import { useParams } from 'next/navigation'
 import type { DateRange } from 'react-day-picker'
 import { EventTopBar } from '@/components/tripsync/event-top-bar'
@@ -73,6 +73,7 @@ export default function EventPage() {
   const [selectedParticipantId, setSelectedParticipantId] = useState<string | null>(null)
   const [editingParticipant, setEditingParticipant] = useState<ParticipantData | null>(null)
   const [savedEditCode, setSavedEditCode] = useState<string | null>(null)
+  const availabilitySectionRef = useRef<HTMLDivElement>(null)
 
   const loadTrip = useCallback(async () => {
     setIsLoading(true)
@@ -217,6 +218,7 @@ export default function EventPage() {
   // Reset to view mode (after submission)
   const handleViewCalendar = useCallback(() => {
     setSelectedParticipantId((current) => current ?? participants[0]?.id ?? null)
+    availabilitySectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }, [participants])
 
   const shareUrl = useMemo(() => {
@@ -302,6 +304,7 @@ export default function EventPage() {
                 onSelectParticipant={setSelectedParticipantId}
                 currentUserId={currentUserId}
                 onEditParticipant={handleEditSubmission}
+                availabilitySectionRef={availabilitySectionRef}
               />
             </div>
           </div>

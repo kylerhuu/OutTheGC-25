@@ -8,6 +8,7 @@ import type { ParticipantData } from '@/app/event/[tripId]/page'
 interface AvailabilityHeatmapProps {
   participants: ParticipantData[]
   tripDateRange: { from: Date; to: Date }
+  tripDuration: number
 }
 
 interface DayData {
@@ -17,7 +18,7 @@ interface DayData {
   percentage: number
 }
 
-export function AvailabilityHeatmap({ participants, tripDateRange }: AvailabilityHeatmapProps) {
+export function AvailabilityHeatmap({ participants, tripDateRange, tripDuration }: AvailabilityHeatmapProps) {
   // Generate all days in the trip date range with availability counts
   const heatmapData = useMemo(() => {
     const days: DayData[] = []
@@ -95,6 +96,42 @@ export function AvailabilityHeatmap({ participants, tripDateRange }: Availabilit
 
   const dayLabels = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
 
+  const bestWindows = useMemo(() => {
+    if (participants.length === 0 || heatmapData.length === 0 || tripDuration > heatmapData.length) {
+      return []
+    }
+
+    const windows: Array<{
+      start: Date
+      end: Date
+      score: number
+      average: number
+      perfectDays: number
+    }> = []
+
+    for (let startIndex = 0; startIndex <= heatmapData.length - tripDuration; startIndex += 1) {
+      const slice = heatmapData.slice(startIndex, startIndex + tripDuration)
+      const totalAvailable = slice.reduce((sum, day) => sum + day.count, 0)
+      const perfectDays = slice.filter((day) => day.count === day.total).length
+
+      windows.push({
+        start: slice[0].date,
+        end: slice[slice.length - 1].date,
+        score: totalAvailable,
+        average: totalAvailable / slice.length,
+        perfectDays,
+      })
+    }
+
+    return windows
+      .sort((a, b) => {
+        if (b.score !== a.score) return b.score - a.score
+        if (b.perfectDays !== a.perfectDays) return b.perfectDays - a.perfectDays
+        return a.start.getTime() - b.start.getTime()
+      })
+      .slice(0, 3)
+  }, [heatmapData, participants.length, tripDuration])
+
   if (participants.length === 0) {
     return (
       <Card className="bg-card border-border/60 shadow-sm">
@@ -121,6 +158,37 @@ export function AvailabilityHeatmap({ participants, tripDateRange }: Availabilit
       </CardHeader>
       <CardContent className="pt-0">
         <div className="flex flex-col gap-3">
+          {bestWindows.length > 0 && (
+            <div className="rounded-xl border border-border/50 bg-muted/30 p-3">
+              <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Best {tripDuration}-day windows
+              </p>
+              <div className="space-y-2">
+                {bestWindows.map((window, index) => (
+                  <div
+                    key={`${window.start.toISOString()}-${window.end.toISOString()}`}
+                    className="flex items-start justify-between gap-3 rounded-lg bg-background px-3 py-2"
+                  >
+                    <div>
+                      <p className="text-sm font-medium text-foreground">
+                        {window.start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {window.end.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Avg {window.average.toFixed(1)} people available per day
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs font-semibold text-primary">#{index + 1}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {window.perfectDays} perfect day{window.perfectDays === 1 ? '' : 's'}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Day labels */}
           <div className="grid grid-cols-7 gap-1">
             {dayLabels.map((label, i) => (

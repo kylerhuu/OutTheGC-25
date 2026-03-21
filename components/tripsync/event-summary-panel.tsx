@@ -1,5 +1,6 @@
 'use client'
 
+import type { RefObject } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
@@ -18,6 +19,7 @@ interface EventSummaryPanelProps {
   onSelectParticipant: (id: string | null) => void
   currentUserId: string | null
   onEditParticipant: (id: string) => void
+  availabilitySectionRef?: RefObject<HTMLDivElement | null>
 }
 
 export function EventSummaryPanel({ 
@@ -28,7 +30,8 @@ export function EventSummaryPanel({
   selectedParticipantId,
   onSelectParticipant,
   currentUserId,
-  onEditParticipant
+  onEditParticipant,
+  availabilitySectionRef,
 }: EventSummaryPanelProps) {
   // Aggregate data
   const destinationCounts = participants.reduce((acc, p) => {
@@ -132,10 +135,13 @@ export function EventSummaryPanel({
       )}
 
       {/* Group Availability Heatmap */}
-      <AvailabilityHeatmap
-        participants={participants}
-        tripDateRange={tripDateRange}
-      />
+      <div ref={availabilitySectionRef} className="scroll-mt-24">
+        <AvailabilityHeatmap
+          participants={participants}
+          tripDateRange={tripDateRange}
+          tripDuration={tripDuration}
+        />
+      </div>
 
       {/* Trip Duration */}
       <Card className="bg-card border-border/60 shadow-sm">
