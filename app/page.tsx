@@ -29,11 +29,11 @@ export default function Home() {
         </div>
 
         <h1 className="text-5xl sm:text-6xl font-bold text-foreground tracking-tight leading-tight text-balance max-w-2xl mb-5">
-          Stop arguing in the group chat
+          Stop planning trips in 67 separate messages
         </h1>
 
-        <p className="text-lg text-muted-foreground max-w-md leading-relaxed text-pretty mb-10">
-          Collect availability, ideas, and preferences in one shared link.
+        <p className="text-lg text-muted-foreground max-w-xl leading-relaxed text-pretty mb-10">
+          See availability, destination votes, and everyone&apos;s preferences in one place.
         </p>
 
         <div className="flex flex-col items-center gap-3">
@@ -50,9 +50,35 @@ export default function Home() {
       {/* Preview card */}
       <section className="flex flex-col items-center px-6 pb-24 pt-8">
         <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest mb-6">
-          Example trip
+          Two ways this goes
         </p>
-        <TripPreviewCard />
+        <div className="grid w-full max-w-5xl gap-6 md:grid-cols-2">
+          <TripPreviewCard
+            label="Polished example"
+            tripName="Summer Senior Trip"
+            peopleLabel="7 people"
+            dateRange="Jun 18 – Jun 22, 2026"
+            responseStatus="5 responses in"
+            bestOverlap="Jun 18–22"
+            topPicks="Barcelona, Lisbon"
+            budget="$$"
+            missing="2 people still haven’t answered"
+            note="Maya: free after graduation weekend"
+          />
+          <TripPreviewCard
+            label="A little too aspirational"
+            tripName="Rich Baddie Escape"
+            peopleLabel="4 people"
+            dateRange="Jan 18 – Jan 22, 2027"
+            responseStatus="3 responses in"
+            bestOverlap="Jan 18–22"
+            topPicks="Maldives, St. Barts"
+            budget="$$$$"
+            missing="1 person is still pretending budget matters"
+            note="Ava: if the villa doesn't have a private pool I'm staying home"
+            accent="fun"
+          />
+        </div>
       </section>
 
       {/* Footer */}
