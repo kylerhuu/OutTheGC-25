@@ -64,6 +64,7 @@ export default function Home() {
             budget="$$"
             missing="2 people still haven’t answered"
             note="Maya: free after graduation weekend"
+            onAction={() => setModalOpen(true)}
           />
           <TripPreviewCard
             label="A little too aspirational"
@@ -76,6 +77,7 @@ export default function Home() {
             budget="$$$$"
             missing="1 person is still pretending budget matters"
             note="Ava: if the villa doesn't have a private pool I'm staying home"
+            onAction={() => setModalOpen(true)}
             accent="fun"
           />
         </div>

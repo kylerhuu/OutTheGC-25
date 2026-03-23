@@ -1,4 +1,4 @@
-import { CalendarDays, Copy, Users, MapPin, MessageSquare } from "lucide-react"
+import { CalendarDays, ArrowUpRight, Users, MapPin, MessageSquare } from "lucide-react"
 
 interface TripPreviewCardProps {
   label: string
@@ -11,6 +11,7 @@ interface TripPreviewCardProps {
   budget: string
   missing: string
   note: string
+  onAction?: () => void
   accent?: "default" | "fun"
 }
 
@@ -25,6 +26,7 @@ export function TripPreviewCard({
   budget,
   missing,
   note,
+  onAction,
   accent = "default",
 }: TripPreviewCardProps) {
   const isFun = accent === "fun"
@@ -96,9 +98,14 @@ export function TripPreviewCard({
         </div>
 
         {/* Copy link */}
-        <button className="w-full flex items-center justify-center gap-2 border border-border rounded-xl py-2.5 text-sm font-medium text-foreground hover:bg-muted transition-colors">
-          <Copy className="w-3.5 h-3.5" />
-          Open trip page
+        <button
+          type="button"
+          onClick={onAction}
+          className="w-full flex items-center justify-center gap-2 border border-border rounded-xl py-2.5 text-sm font-medium text-foreground hover:bg-muted transition-colors"
+          aria-label="Create your own trip from this example"
+        >
+          <ArrowUpRight className="w-3.5 h-3.5" />
+          Build one like this
         </button>
       </div>
     </div>
