@@ -23,8 +23,22 @@ export interface ResponseRecord {
   updatedAt: string
 }
 
+export interface PublicResponseRecord {
+  id: string
+  tripId: string
+  name: string
+  availabilityStart: string | null
+  availabilityEnd: string | null
+  destinations: string[]
+  budget: string
+  interests: string[]
+  notes: string
+  submittedAt: string
+  updatedAt: string
+}
+
 export interface TripWithResponses extends TripRecord {
-  responses: ResponseRecord[]
+  responses: PublicResponseRecord[]
 }
 
 export interface TripPlanTodoRecord {

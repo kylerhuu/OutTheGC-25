@@ -3,6 +3,7 @@ import type {
   CreateResponseInput,
   CreateTripInput,
   CreateTripPlanTodoInput,
+  PublicResponseRecord,
   RecoverResponseInput,
   ResponseRecord,
   TripPlanPageData,
@@ -107,6 +108,34 @@ function mapResponseRecord(response: {
   }
 }
 
+function mapPublicResponseRecord(response: {
+  id: string
+  tripId: string
+  name: string
+  availabilityStart: string | null
+  availabilityEnd: string | null
+  destinations: string[]
+  budget: string
+  interests: string[]
+  notes: string
+  submittedAt: Date
+  updatedAt: Date
+}): PublicResponseRecord {
+  return {
+    id: response.id,
+    tripId: response.tripId,
+    name: response.name,
+    availabilityStart: response.availabilityStart,
+    availabilityEnd: response.availabilityEnd,
+    destinations: response.destinations,
+    budget: response.budget,
+    interests: response.interests,
+    notes: response.notes,
+    submittedAt: response.submittedAt.toISOString(),
+    updatedAt: response.updatedAt.toISOString(),
+  }
+}
+
 function mapTripWithResponses(trip: {
   id: string
   name: string
@@ -132,7 +161,7 @@ function mapTripWithResponses(trip: {
 }): TripWithResponses {
   return {
     ...mapTripRecord(trip),
-    responses: trip.responses.map(mapResponseRecord),
+    responses: trip.responses.map(mapPublicResponseRecord),
   }
 }
 

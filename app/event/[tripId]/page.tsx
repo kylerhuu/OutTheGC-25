@@ -6,12 +6,11 @@ import type { DateRange } from 'react-day-picker'
 import { EventTopBar } from '@/components/tripsync/event-top-bar'
 import { EventInputPanel } from '@/components/tripsync/event-input-panel'
 import { EventSummaryPanel } from '@/components/tripsync/event-summary-panel'
-import type { CreateResponseInput, ResponseRecord, TripWithResponses } from '@/lib/trip-types'
+import type { CreateResponseInput, PublicResponseRecord, ResponseRecord, TripWithResponses } from '@/lib/trip-types'
 
 export interface ParticipantData {
   id: string
   name: string
-  editCode: string
   availability: { from: Date; to: Date } | null
   destinations: string[]
   budget: string
@@ -65,11 +64,10 @@ function getTripAccessKey(tripId: string) {
   return `outthegc:trip-access:${tripId}`
 }
 
-function responseToParticipant(response: ResponseRecord): ParticipantData {
+function responseToParticipant(response: PublicResponseRecord | ResponseRecord): ParticipantData {
   return {
     id: response.id,
     name: response.name,
-    editCode: response.editCode,
     availability:
       response.availabilityStart && response.availabilityEnd
         ? {

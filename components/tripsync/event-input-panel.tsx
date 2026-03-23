@@ -118,7 +118,6 @@ export function EventInputPanel({
       setBudget(editingParticipant.budget)
       setInterests(editingParticipant.interests)
       setNotes(editingParticipant.notes || '')
-      setEditCode(editingParticipant.editCode || '')
     } else {
       // Reset form
       setName('')
