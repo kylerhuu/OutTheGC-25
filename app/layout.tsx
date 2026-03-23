@@ -7,21 +7,9 @@ export const metadata: Metadata = {
   description: 'finally get your trip out of the gc',
   generator: 'v0.app',
   icons: {
-    icon: [
-      {
-        url: '/icon-light-32x32.png',
-        media: '(prefers-color-scheme: light)',
-      },
-      {
-        url: '/icon-dark-32x32.png',
-        media: '(prefers-color-scheme: dark)',
-      },
-      {
-        url: '/icon.svg',
-        type: 'image/svg+xml',
-      },
-    ],
-    apple: '/apple-icon.png',
+    icon: '/outthegc-mark.svg',
+    shortcut: '/outthegc-mark.svg',
+    apple: '/outthegc-mark.svg',
   },
 }
 

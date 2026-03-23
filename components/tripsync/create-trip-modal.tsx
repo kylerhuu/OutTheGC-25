@@ -1,8 +1,9 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { X, Plane } from "lucide-react"
+import { X } from "lucide-react"
 import { CopyButton } from "@/components/tripsync/copy-button"
+import { OutTheGCLogo } from "@/components/tripsync/outthegc-logo"
 import type { TripRecord } from "@/lib/trip-types"
 
 interface CreateTripModalProps {
@@ -100,9 +101,7 @@ export function CreateTripModal({ open, onClose }: CreateTripModalProps) {
         {!generated ? (
           <>
             <div className="flex items-center gap-3 mb-6">
-              <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center">
-                <Plane className="w-4 h-4 text-primary" />
-              </div>
+              <OutTheGCLogo showText={false} markClassName="h-10 w-10" />
               <div>
                 <h2 id="modal-title" className="text-lg font-semibold text-foreground">
                   New Trip
@@ -181,9 +180,7 @@ export function CreateTripModal({ open, onClose }: CreateTripModalProps) {
           </>
         ) : (
           <div className="flex flex-col items-center text-center gap-5 py-2">
-            <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center">
-              <Plane className="w-6 h-6 text-primary" />
-            </div>
+            <OutTheGCLogo showText={false} markClassName="h-16 w-16" />
             <div>
               <h2 className="text-xl font-semibold text-foreground mb-1">Your link is ready!</h2>
               <p className="text-sm text-muted-foreground">

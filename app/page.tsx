@@ -1,8 +1,8 @@
 "use client"
 
 import { useState } from "react"
-import { Plane } from "lucide-react"
 import { CreateTripModal } from "@/components/tripsync/create-trip-modal"
+import { OutTheGCLogo } from "@/components/tripsync/outthegc-logo"
 import { TripPreviewCard } from "@/components/tripsync/trip-preview-card"
 
 export default function Home() {
@@ -12,12 +12,7 @@ export default function Home() {
     <main className="min-h-screen bg-background flex flex-col">
       {/* Nav */}
       <header className="w-full flex items-center justify-between px-6 py-5 max-w-5xl mx-auto">
-        <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center">
-            <Plane className="w-3.5 h-3.5 text-primary-foreground" />
-          </div>
-          <span className="text-base font-semibold text-foreground tracking-tight">OutTheGC</span>
-        </div>
+        <OutTheGCLogo markClassName="h-9 w-9" textClassName="h-7" />
         <button
           onClick={() => setModalOpen(true)}
           className="text-sm font-medium text-primary hover:opacity-80 transition-opacity"

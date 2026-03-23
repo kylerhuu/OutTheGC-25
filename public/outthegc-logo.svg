@@ -1,0 +1,18 @@
+<svg width="512" height="160" viewBox="0 0 512 160" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="outthegc-logo-mark" x1="60" y1="16" x2="118" y2="107" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#4FE0BC" />
+      <stop offset="55%" stop-color="#42B7F5" />
+      <stop offset="100%" stop-color="#A43FE1" />
+    </linearGradient>
+    <linearGradient id="outthegc-logo-wordmark" x1="138" y1="78" x2="475" y2="102" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#2EC6C8" />
+      <stop offset="55%" stop-color="#5B82D8" />
+      <stop offset="100%" stop-color="#B233E5" />
+    </linearGradient>
+  </defs>
+  <path d="M89 14C65.2 14 45.75 33 45.75 57.15C45.75 78.86 63.02 103.55 82.69 120.14C86.43 123.31 91.57 123.31 95.31 120.14C114.98 103.55 132.25 78.86 132.25 57.15C132.25 33 112.8 14 89 14Z" fill="url(#outthegc-logo-mark)"/>
+  <path d="M113.11 36.08C110.96 36.03 108.09 37.42 104.66 40.17L92.56 50.52L77.51 48.35C73.25 47.76 70.34 48.98 68.08 52.05L84.38 60.9L66.44 78.69L57.84 77.68C56.69 77.55 56.11 79.01 57.04 79.74L66.74 87.31L68.08 98.37C68.24 99.57 69.73 99.94 70.43 98.96L75.98 91.16L93.99 73.15L96.61 90.86C99.64 88.64 101.05 85.75 100.46 81.52L98.23 66.49L108.64 54.34C113.71 48.08 115.26 43.72 115.04 40.5C114.93 37.86 114.43 36.11 113.11 36.08Z" fill="white"/>
+  <path d="M69.57 80.97C63.68 84.65 56.12 85.74 48.19 83.99C47.26 83.79 46.51 84.85 47.08 85.6L47.48 86.1C53.68 94.14 65.45 95.68 73.52 89.59L80.03 84.67L69.57 80.97Z" fill="white" fill-opacity="0.96"/>
+  <text x="152" y="107" fill="url(#outthegc-logo-wordmark)" font-family="Arial, Helvetica, sans-serif" font-size="78" font-weight="700" letter-spacing="-4">OutTheGC</text>
+</svg>
