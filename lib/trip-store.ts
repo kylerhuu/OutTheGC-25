@@ -5,10 +5,6 @@ function generateId(length = 10) {
   return Math.random().toString(36).slice(2, 2 + length)
 }
 
-function generateEditCode() {
-  return generateId(8)
-}
-
 function normalizeDestinationName(value: string) {
   return value.trim().replace(/\s+/g, ' ').toLowerCase()
 }
@@ -234,12 +230,14 @@ export async function createResponse(tripId: string, input: CreateResponseInput)
 
   await syncTripDestinationOptions(tripId, destinations)
 
+  const normalizedEditCode = input.editCode?.trim() || ''
+
   const response = await prisma.tripResponse.create({
     data: {
       id: generateId(10),
       tripId,
       name,
-      editCode: input.editCode?.trim() || generateEditCode(),
+      editCode: normalizedEditCode,
       availabilityStart: input.availabilityStart || null,
       availabilityEnd: input.availabilityEnd || null,
       destinations,
@@ -268,9 +266,9 @@ export async function updateResponse(
     throw new Error('Response not found.')
   }
 
-  const providedCode = input.editCode?.trim()
+  const providedCode = input.editCode?.trim() || ''
 
-  if (!providedCode || providedCode !== existing.editCode) {
+  if (providedCode !== existing.editCode) {
     throw new Error('Invalid edit code.')
   }
 
@@ -331,8 +329,8 @@ export async function recoverResponse(tripId: string, input: RecoverResponseInpu
   const name = input.name.trim()
   const editCode = input.editCode.trim()
 
-  if (!name || !editCode) {
-    throw new Error('Name and edit code are required.')
+  if (!name) {
+    throw new Error('Name is required.')
   }
 
   const matchingName = await prisma.tripResponse.findFirst({
@@ -350,7 +348,7 @@ export async function recoverResponse(tripId: string, input: RecoverResponseInpu
   }
 
   if (matchingName.editCode !== editCode) {
-    throw new Error('Wrong edit code.')
+    throw new Error(matchingName.editCode ? 'Wrong edit code.' : 'This response was saved without an edit code. Leave the edit code blank to recover it.')
   }
 
   return mapResponseRecord(matchingName)

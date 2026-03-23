@@ -187,8 +187,8 @@ export function EventInputPanel({
   }
 
   const handleRecover = async () => {
-    if (!recoveryName.trim() || !recoveryEditCode.trim()) {
-      setRecoveryError('Enter both your name and edit code.')
+    if (!recoveryName.trim()) {
+      setRecoveryError('Enter your name to recover your response.')
       return
     }
 
@@ -281,7 +281,7 @@ export function EventInputPanel({
           <div className="rounded-xl border border-border/60 bg-muted/30 p-4">
             <p className="text-sm font-semibold text-foreground">Already answered?</p>
             <p className="mt-1 text-xs text-muted-foreground">
-              Enter your name + edit code to recover and edit your response.
+              Enter your name and, if you set one, your edit code to recover your response.
             </p>
             {!recoveryOpen ? (
               <Button
@@ -303,7 +303,7 @@ export function EventInputPanel({
                   onChange={(e) => setRecoveryName(e.target.value)}
                 />
                 <Input
-                  placeholder="Edit code"
+                  placeholder="Edit code (optional)"
                   value={recoveryEditCode}
                   onChange={(e) => setRecoveryEditCode(e.target.value)}
                 />
@@ -358,7 +358,7 @@ export function EventInputPanel({
               className="h-10 text-base"
             />
             <p className="text-xs text-muted-foreground">
-              Remember this code to edit your submission later
+              Leave this blank if you do not want to use an edit code
             </p>
           </div>
         )}
