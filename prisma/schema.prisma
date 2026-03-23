@@ -8,13 +8,14 @@ datasource db {
 }
 
 model Trip {
-  id          String         @id
-  name        String
-  description String
-  startDate   String
-  endDate     String
-  createdAt   DateTime       @default(now())
-  responses   TripResponse[]
+  id                 String            @id
+  name               String
+  description        String
+  startDate          String
+  endDate            String
+  createdAt          DateTime          @default(now())
+  responses          TripResponse[]
+  destinationOptions TripDestination[]
 }
 
 model TripResponse {
@@ -33,4 +34,16 @@ model TripResponse {
   trip              Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade)
 
   @@index([tripId])
+}
+
+model TripDestination {
+  id             String   @id
+  tripId         String
+  name           String
+  normalizedName String
+  createdAt      DateTime @default(now())
+  trip           Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade)
+
+  @@index([tripId])
+  @@unique([tripId, normalizedName])
 }

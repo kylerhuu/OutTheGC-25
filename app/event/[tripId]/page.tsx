@@ -35,6 +35,32 @@ interface SaveResponsePayload {
   error?: string
 }
 
+function getDestinationOptions(destinationOptions: string[]) {
+  const defaults = [
+    'Barcelona',
+    'Lisbon',
+    'Tokyo',
+    'Bali',
+    'Iceland',
+    'Costa Rica',
+    'Portugal',
+    'Greece',
+  ]
+
+  const seen = new Set<string>()
+  const merged: string[] = []
+
+  for (const destination of [...defaults, ...destinationOptions]) {
+    const trimmed = destination.trim().replace(/\s+/g, ' ')
+    const normalized = trimmed.toLowerCase()
+    if (!trimmed || seen.has(normalized)) continue
+    seen.add(normalized)
+    merged.push(trimmed)
+  }
+
+  return merged
+}
+
 function getTripAccessKey(tripId: string) {
   return `outthegc:trip-access:${tripId}`
 }
@@ -134,6 +160,37 @@ export default function EventPage() {
   useEffect(() => {
     void loadTrip()
   }, [loadTrip])
+
+  const handleRecoverSubmission = useCallback(async (input: { name: string; editCode: string }) => {
+    const response = await fetch(`/api/trips/${tripId}/responses/recover`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(input),
+    })
+
+    const data = (await response.json()) as SaveResponsePayload
+
+    if (!response.ok || !data.response) {
+      throw new Error(data.error || 'Unable to recover response.')
+    }
+
+    const recoveredParticipant = responseToParticipant(data.response)
+    const nextAccess = {
+      responseId: data.response.id,
+      editCode: data.response.editCode,
+    }
+
+    window.localStorage.setItem(getTripAccessKey(tripId), JSON.stringify(nextAccess))
+
+    setTripAccess(nextAccess)
+    setCurrentUserId(recoveredParticipant.id)
+    setSavedEditCode(data.response.editCode)
+    setSelectedParticipantId(recoveredParticipant.id)
+    setEditingParticipant(recoveredParticipant)
+    setHasSubmitted(false)
+  }, [tripId])
 
   // Handle new submission or update existing
   const handleSubmit = useCallback(async (input: {
@@ -284,7 +341,9 @@ export default function EventPage() {
             <div className="lg:col-span-3">
               <EventInputPanel
                 tripDateRange={{ from: new Date(trip.startDate), to: new Date(trip.endDate) }}
+                destinationOptions={getDestinationOptions(trip.destinationOptions)}
                 onSubmit={handleSubmit}
+                onRecoverSubmission={handleRecoverSubmission}
                 hasSubmitted={hasSubmitted}
                 editingParticipant={editingParticipant}
                 onEditSubmission={currentUserId ? () => handleEditSubmission(currentUserId) : undefined}

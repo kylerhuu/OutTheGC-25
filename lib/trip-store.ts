@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma'
-import type { CreateResponseInput, CreateTripInput, ResponseRecord, TripRecord, TripWithResponses } from '@/lib/trip-types'
+import type { CreateResponseInput, CreateTripInput, RecoverResponseInput, ResponseRecord, TripRecord, TripWithResponses } from '@/lib/trip-types'
 
 function generateId(length = 10) {
   return Math.random().toString(36).slice(2, 2 + length)
@@ -7,6 +7,10 @@ function generateId(length = 10) {
 
 function generateEditCode() {
   return generateId(8)
+}
+
+function normalizeDestinationName(value: string) {
+  return value.trim().replace(/\s+/g, ' ').toLowerCase()
 }
 
 function normalizeDate(value: string) {
@@ -29,6 +33,20 @@ function normalizeList(items: string[] | undefined) {
   )
 }
 
+function mergeDestinationOptions(defaults: string[], shared: string[]) {
+  const seen = new Set<string>()
+  const merged: string[] = []
+
+  for (const item of [...defaults, ...shared]) {
+    const normalized = normalizeDestinationName(item)
+    if (!normalized || seen.has(normalized)) continue
+    seen.add(normalized)
+    merged.push(item.trim().replace(/\s+/g, ' '))
+  }
+
+  return merged
+}
+
 function mapTripRecord(trip: {
   id: string
   name: string
@@ -36,10 +54,16 @@ function mapTripRecord(trip: {
   startDate: string
   endDate: string
   createdAt: Date
+  destinationOptions?: Array<{ name: string }>
 }): TripRecord {
   return {
-    ...trip,
+    id: trip.id,
+    name: trip.name,
+    description: trip.description,
+    startDate: trip.startDate,
+    endDate: trip.endDate,
     createdAt: trip.createdAt.toISOString(),
+    destinationOptions: trip.destinationOptions?.map((option) => option.name) ?? [],
   }
 }
 
@@ -99,6 +123,9 @@ export async function createTrip(input: CreateTripInput): Promise<TripRecord> {
       startDate: input.startDate,
       endDate: input.endDate,
     },
+    include: {
+      destinationOptions: true,
+    },
   })
 
   return mapTripRecord(trip)
@@ -108,6 +135,11 @@ export async function getTripWithResponses(tripId: string): Promise<TripWithResp
   const trip = await prisma.trip.findUnique({
     where: { id: tripId },
     include: {
+      destinationOptions: {
+        orderBy: {
+          createdAt: 'asc',
+        },
+      },
       responses: {
         orderBy: {
           submittedAt: 'asc',
@@ -124,6 +156,39 @@ export async function getTripWithResponses(tripId: string): Promise<TripWithResp
     ...mapTripRecord(trip),
     responses: trip.responses.map(mapResponseRecord),
   }
+}
+
+async function syncTripDestinationOptions(tripId: string, destinations: string[]) {
+  const normalizedDestinations = destinations
+    .map((destination) => ({
+      name: destination.trim().replace(/\s+/g, ' '),
+      normalizedName: normalizeDestinationName(destination),
+    }))
+    .filter((destination) => destination.normalizedName)
+
+  if (normalizedDestinations.length === 0) {
+    return
+  }
+
+  await prisma.$transaction(
+    normalizedDestinations.map((destination) =>
+      prisma.tripDestination.upsert({
+        where: {
+          tripId_normalizedName: {
+            tripId,
+            normalizedName: destination.normalizedName,
+          },
+        },
+        update: {},
+        create: {
+          id: generateId(10),
+          tripId,
+          name: destination.name,
+          normalizedName: destination.normalizedName,
+        },
+      }),
+    ),
+  )
 }
 
 export async function createResponse(tripId: string, input: CreateResponseInput): Promise<ResponseRecord> {
@@ -166,6 +231,8 @@ export async function createResponse(tripId: string, input: CreateResponseInput)
       throw new Error('Availability must stay within the trip date range.')
     }
   }
+
+  await syncTripDestinationOptions(tripId, destinations)
 
   const response = await prisma.tripResponse.create({
     data: {
@@ -241,6 +308,8 @@ export async function updateResponse(
     }
   }
 
+  await syncTripDestinationOptions(tripId, destinations)
+
   const response = await prisma.tripResponse.update({
     where: {
       id: responseId,
@@ -256,4 +325,48 @@ export async function updateResponse(
   })
 
   return mapResponseRecord(response)
+}
+
+export async function recoverResponse(tripId: string, input: RecoverResponseInput): Promise<ResponseRecord> {
+  const name = input.name.trim()
+  const editCode = input.editCode.trim()
+
+  if (!name || !editCode) {
+    throw new Error('Name and edit code are required.')
+  }
+
+  const matchingName = await prisma.tripResponse.findFirst({
+    where: {
+      tripId,
+      name: {
+        equals: name,
+        mode: 'insensitive',
+      },
+    },
+  })
+
+  if (!matchingName) {
+    throw new Error('No matching response found.')
+  }
+
+  if (matchingName.editCode !== editCode) {
+    throw new Error('Wrong edit code.')
+  }
+
+  return mapResponseRecord(matchingName)
+}
+
+const DEFAULT_DESTINATION_OPTIONS = [
+  'Barcelona',
+  'Lisbon',
+  'Tokyo',
+  'Bali',
+  'Iceland',
+  'Costa Rica',
+  'Portugal',
+  'Greece',
+]
+
+export function getDestinationOptions(trip: TripRecord) {
+  return mergeDestinationOptions(DEFAULT_DESTINATION_OPTIONS, trip.destinationOptions)
 }

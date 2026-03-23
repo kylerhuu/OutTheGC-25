@@ -5,6 +5,7 @@ export interface TripRecord {
   startDate: string
   endDate: string
   createdAt: string
+  destinationOptions: string[]
 }
 
 export interface ResponseRecord {
@@ -42,4 +43,9 @@ export interface CreateResponseInput {
   interests?: string[]
   notes?: string
   editCode?: string
+}
+
+export interface RecoverResponseInput {
+  name: string
+  editCode: string
 }

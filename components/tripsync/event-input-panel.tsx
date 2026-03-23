@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { DateRange } from 'react-day-picker'
 import { Plus, X, Eye, Pencil } from 'lucide-react'
 import { Calendar } from '@/components/ui/calendar'
@@ -20,10 +20,6 @@ import {
 import { Label } from '@/components/ui/label'
 import { Spinner } from '@/components/ui/spinner'
 import type { ParticipantData } from '@/app/event/[tripId]/page'
-
-const DESTINATION_SUGGESTIONS = [
-  'Barcelona', 'Lisbon', 'Tokyo', 'Bali', 'Iceland', 'Costa Rica', 'Portugal', 'Greece'
-]
 
 const INTEREST_OPTIONS = [
   { id: 'beach', label: 'Beach' },
@@ -55,7 +51,9 @@ interface UserInput {
 
 interface EventInputPanelProps {
   tripDateRange: { from: Date; to: Date }
+  destinationOptions: string[]
   onSubmit: (input: UserInput) => Promise<void>
+  onRecoverSubmission: (input: { name: string; editCode: string }) => Promise<void>
   hasSubmitted?: boolean
   editingParticipant?: ParticipantData | null
   onEditSubmission?: () => void
@@ -65,7 +63,9 @@ interface EventInputPanelProps {
 
 export function EventInputPanel({ 
   tripDateRange, 
+  destinationOptions,
   onSubmit, 
+  onRecoverSubmission,
   hasSubmitted = false,
   editingParticipant,
   onEditSubmission,
@@ -82,6 +82,28 @@ export function EventInputPanel({
   const [editCode, setEditCode] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
+  const [recoveryOpen, setRecoveryOpen] = useState(false)
+  const [recoveryName, setRecoveryName] = useState('')
+  const [recoveryEditCode, setRecoveryEditCode] = useState('')
+  const [recoveryError, setRecoveryError] = useState('')
+  const [isRecovering, setIsRecovering] = useState(false)
+
+  const normalizedDestinationOptions = useMemo(() => {
+    const seen = new Set<string>()
+    const merged: string[] = []
+
+    for (const destination of [...destinationOptions, ...destinations]) {
+      const trimmed = destination.trim().replace(/\s+/g, ' ')
+      const normalized = trimmed.toLowerCase()
+
+      if (!trimmed || seen.has(normalized)) continue
+
+      seen.add(normalized)
+      merged.push(trimmed)
+    }
+
+    return merged
+  }, [destinationOptions, destinations])
 
   // Populate form when editing
   useEffect(() => {
@@ -108,19 +130,26 @@ export function EventInputPanel({
       setEditCode('')
     }
     setSubmitError('')
+    setRecoveryError('')
   }, [editingParticipant])
 
   const addDestination = (dest: string) => {
-    const trimmed = dest.trim()
-    if (trimmed && !destinations.includes(trimmed)) {
+    const trimmed = dest.trim().replace(/\s+/g, ' ')
+    const normalized = trimmed.toLowerCase()
+
+    if (trimmed && !destinations.some((item) => item.trim().toLowerCase() === normalized)) {
       setDestinations([...destinations, trimmed])
     }
     setCustomDestination('')
   }
 
   const removeDestination = (dest: string) => {
-    setDestinations(destinations.filter(d => d !== dest))
+    const normalized = dest.trim().toLowerCase()
+    setDestinations(destinations.filter(d => d.trim().toLowerCase() !== normalized))
   }
+
+  const isDestinationSelected = (dest: string) =>
+    destinations.some((item) => item.trim().toLowerCase() === dest.trim().toLowerCase())
 
   const toggleInterest = (interestId: string) => {
     setInterests(prev =>
@@ -154,6 +183,30 @@ export function EventInputPanel({
       setSubmitError(error instanceof Error ? error.message : 'Unable to save your response.')
     } finally {
       setIsSubmitting(false)
+    }
+  }
+
+  const handleRecover = async () => {
+    if (!recoveryName.trim() || !recoveryEditCode.trim()) {
+      setRecoveryError('Enter both your name and edit code.')
+      return
+    }
+
+    setIsRecovering(true)
+    setRecoveryError('')
+
+    try {
+      await onRecoverSubmission({
+        name: recoveryName,
+        editCode: recoveryEditCode,
+      })
+      setRecoveryOpen(false)
+      setRecoveryName('')
+      setRecoveryEditCode('')
+    } catch (error) {
+      setRecoveryError(error instanceof Error ? error.message : 'Unable to recover response.')
+    } finally {
+      setIsRecovering(false)
     }
   }
 
@@ -224,6 +277,57 @@ export function EventInputPanel({
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-8">
+        {!isEditMode && (
+          <div className="rounded-xl border border-border/60 bg-muted/30 p-4">
+            <p className="text-sm font-semibold text-foreground">Already answered?</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Enter your name + edit code to recover and edit your response.
+            </p>
+            {!recoveryOpen ? (
+              <Button
+                type="button"
+                variant="outline"
+                className="mt-3"
+                onClick={() => {
+                  setRecoveryOpen(true)
+                  setRecoveryError('')
+                }}
+              >
+                Recover My Response
+              </Button>
+            ) : (
+              <div className="mt-4 flex flex-col gap-3">
+                <Input
+                  placeholder="Your name"
+                  value={recoveryName}
+                  onChange={(e) => setRecoveryName(e.target.value)}
+                />
+                <Input
+                  placeholder="Edit code"
+                  value={recoveryEditCode}
+                  onChange={(e) => setRecoveryEditCode(e.target.value)}
+                />
+                <div className="flex gap-2">
+                  <Button type="button" onClick={handleRecover} disabled={isRecovering}>
+                    {isRecovering ? 'Recovering...' : 'Load My Response'}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => {
+                      setRecoveryOpen(false)
+                      setRecoveryError('')
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+                {recoveryError && <p className="text-sm text-destructive">{recoveryError}</p>}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Name */}
         <div className="flex flex-col gap-3">
           <Label htmlFor="name" className="text-sm font-medium">Your Name</Label>
@@ -288,23 +392,23 @@ export function EventInputPanel({
         <div className="flex flex-col gap-3 pt-2">
           <Label className="text-sm font-medium">Destination Ideas</Label>
           <div className="flex flex-wrap gap-2">
-            {DESTINATION_SUGGESTIONS.map(dest => (
+            {normalizedDestinationOptions.map(dest => (
               <Badge
                 key={dest}
-                variant={destinations.includes(dest) ? 'default' : 'outline'}
+                variant={isDestinationSelected(dest) ? 'default' : 'outline'}
                 className={`cursor-pointer transition-all text-xs font-medium py-1 px-3 ${
-                  destinations.includes(dest)
+                  isDestinationSelected(dest)
                     ? 'bg-primary text-primary-foreground border-primary'
                     : 'hover:border-primary/50'
                 }`}
                 onClick={() => 
-                  destinations.includes(dest) 
+                  isDestinationSelected(dest) 
                     ? removeDestination(dest) 
                     : addDestination(dest)
                 }
               >
                 {dest}
-                {destinations.includes(dest) && (
+                {isDestinationSelected(dest) && (
                   <X className="size-3 ml-1.5" />
                 )}
               </Badge>
@@ -337,22 +441,6 @@ export function EventInputPanel({
             </Button>
           </div>
 
-          {/* Show custom destinations that aren't in suggestions */}
-          {destinations.filter(d => !DESTINATION_SUGGESTIONS.includes(d)).length > 0 && (
-            <div className="flex flex-wrap gap-2 mt-2">
-              {destinations.filter(d => !DESTINATION_SUGGESTIONS.includes(d)).map(dest => (
-                <Badge
-                  key={dest}
-                  variant="default"
-                  className="cursor-pointer transition-all text-xs font-medium py-1 px-3 bg-primary text-primary-foreground border-primary"
-                  onClick={() => removeDestination(dest)}
-                >
-                  {dest}
-                  <X className="size-3 ml-1.5" />
-                </Badge>
-              ))}
-            </div>
-          )}
         </div>
 
         {/* Budget */}
