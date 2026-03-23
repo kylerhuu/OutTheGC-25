@@ -27,6 +27,57 @@ export interface TripWithResponses extends TripRecord {
   responses: ResponseRecord[]
 }
 
+export interface TripPlanTodoRecord {
+  id: string
+  tripPlanId: string
+  text: string
+  completed: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export interface TripPlanRecord {
+  id: string
+  tripId: string
+  finalDestination: string
+  finalStartDate: string | null
+  finalEndDate: string | null
+  itineraryIdeas: string
+  lodgingNotes: string
+  transportationNotes: string
+  budgetNotes: string
+  groupNotes: string
+  createdAt: string
+  updatedAt: string
+  todos: TripPlanTodoRecord[]
+}
+
+export interface PlanSuggestionCount {
+  label: string
+  count: number
+}
+
+export interface PlanDateWindow {
+  startDate: string
+  endDate: string
+  averageAvailable: number
+  perfectDays: number
+}
+
+export interface TripPlanSuggestions {
+  topDestinations: PlanSuggestionCount[]
+  commonInterests: PlanSuggestionCount[]
+  budgetPreferences: PlanSuggestionCount[]
+  bestDateWindows: PlanDateWindow[]
+  suggestedDurationDays: number
+}
+
+export interface TripPlanPageData {
+  trip: TripWithResponses
+  plan: TripPlanRecord
+  suggestions: TripPlanSuggestions
+}
+
 export interface CreateTripInput {
   name: string
   description?: string
@@ -48,4 +99,24 @@ export interface CreateResponseInput {
 export interface RecoverResponseInput {
   name: string
   editCode: string
+}
+
+export interface UpdateTripPlanInput {
+  finalDestination?: string
+  finalStartDate?: string | null
+  finalEndDate?: string | null
+  itineraryIdeas?: string
+  lodgingNotes?: string
+  transportationNotes?: string
+  budgetNotes?: string
+  groupNotes?: string
+}
+
+export interface CreateTripPlanTodoInput {
+  text: string
+}
+
+export interface UpdateTripPlanTodoInput {
+  text?: string
+  completed?: boolean
 }

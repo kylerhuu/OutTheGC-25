@@ -1,5 +1,19 @@
 import { prisma } from '@/lib/prisma'
-import type { CreateResponseInput, CreateTripInput, RecoverResponseInput, ResponseRecord, TripRecord, TripWithResponses } from '@/lib/trip-types'
+import type {
+  CreateResponseInput,
+  CreateTripInput,
+  CreateTripPlanTodoInput,
+  RecoverResponseInput,
+  ResponseRecord,
+  TripPlanPageData,
+  TripPlanRecord,
+  TripPlanSuggestions,
+  TripPlanTodoRecord,
+  TripRecord,
+  TripWithResponses,
+  UpdateTripPlanInput,
+  UpdateTripPlanTodoInput,
+} from '@/lib/trip-types'
 
 function generateId(length = 10) {
   return Math.random().toString(36).slice(2, 2 + length)
@@ -93,6 +107,246 @@ function mapResponseRecord(response: {
   }
 }
 
+function mapTripWithResponses(trip: {
+  id: string
+  name: string
+  description: string
+  startDate: string
+  endDate: string
+  createdAt: Date
+  destinationOptions?: Array<{ name: string }>
+  responses: Array<{
+    id: string
+    tripId: string
+    name: string
+    editCode: string
+    availabilityStart: string | null
+    availabilityEnd: string | null
+    destinations: string[]
+    budget: string
+    interests: string[]
+    notes: string
+    submittedAt: Date
+    updatedAt: Date
+  }>
+}): TripWithResponses {
+  return {
+    ...mapTripRecord(trip),
+    responses: trip.responses.map(mapResponseRecord),
+  }
+}
+
+function mapTripPlanTodoRecord(todo: {
+  id: string
+  tripPlanId: string
+  text: string
+  completed: boolean
+  createdAt: Date
+  updatedAt: Date
+}): TripPlanTodoRecord {
+  return {
+    id: todo.id,
+    tripPlanId: todo.tripPlanId,
+    text: todo.text,
+    completed: todo.completed,
+    createdAt: todo.createdAt.toISOString(),
+    updatedAt: todo.updatedAt.toISOString(),
+  }
+}
+
+function mapTripPlanRecord(plan: {
+  id: string
+  tripId: string
+  finalDestination: string
+  finalStartDate: string | null
+  finalEndDate: string | null
+  itineraryIdeas: string
+  lodgingNotes: string
+  transportationNotes: string
+  budgetNotes: string
+  groupNotes: string
+  createdAt: Date
+  updatedAt: Date
+  todos?: Array<{
+    id: string
+    tripPlanId: string
+    text: string
+    completed: boolean
+    createdAt: Date
+    updatedAt: Date
+  }>
+}): TripPlanRecord {
+  return {
+    id: plan.id,
+    tripId: plan.tripId,
+    finalDestination: plan.finalDestination,
+    finalStartDate: plan.finalStartDate,
+    finalEndDate: plan.finalEndDate,
+    itineraryIdeas: plan.itineraryIdeas,
+    lodgingNotes: plan.lodgingNotes,
+    transportationNotes: plan.transportationNotes,
+    budgetNotes: plan.budgetNotes,
+    groupNotes: plan.groupNotes,
+    createdAt: plan.createdAt.toISOString(),
+    updatedAt: plan.updatedAt.toISOString(),
+    todos: plan.todos?.map(mapTripPlanTodoRecord) ?? [],
+  }
+}
+
+function countLabels(items: string[]) {
+  const counts = new Map<string, number>()
+
+  for (const item of items) {
+    const label = item.trim()
+    if (!label) continue
+    counts.set(label, (counts.get(label) || 0) + 1)
+  }
+
+  return Array.from(counts.entries())
+    .map(([label, count]) => ({ label, count }))
+    .sort((a, b) => {
+      if (b.count !== a.count) return b.count - a.count
+      return a.label.localeCompare(b.label)
+    })
+}
+
+function getDateWindowSuggestions(trip: TripWithResponses): TripPlanSuggestions['bestDateWindows'] {
+  const tripStart = normalizeDate(trip.startDate)
+  const tripEnd = normalizeDate(trip.endDate)
+  const totalParticipants = trip.responses.length
+
+  if (totalParticipants === 0) {
+    return []
+  }
+
+  const daysInRange = Math.max(
+    1,
+    Math.floor((tripEnd.getTime() - tripStart.getTime()) / (1000 * 60 * 60 * 24)) + 1,
+  )
+  const duration = Math.min(4, daysInRange)
+  const dayCounts: Array<{ date: Date; count: number }> = []
+  const cursor = new Date(tripStart)
+
+  while (cursor <= tripEnd) {
+    const date = new Date(cursor)
+    date.setHours(0, 0, 0, 0)
+
+    const count = trip.responses.filter((response) => {
+      if (!response.availabilityStart || !response.availabilityEnd) return false
+      const availableFrom = new Date(response.availabilityStart)
+      const availableTo = new Date(response.availabilityEnd)
+      availableFrom.setHours(0, 0, 0, 0)
+      availableTo.setHours(23, 59, 59, 999)
+      return date >= availableFrom && date <= availableTo
+    }).length
+
+    dayCounts.push({ date, count })
+    cursor.setDate(cursor.getDate() + 1)
+  }
+
+  const windows: TripPlanSuggestions['bestDateWindows'] = []
+
+  for (let startIndex = 0; startIndex <= dayCounts.length - duration; startIndex += 1) {
+    const slice = dayCounts.slice(startIndex, startIndex + duration)
+    const totalAvailable = slice.reduce((sum, day) => sum + day.count, 0)
+    const perfectDays = slice.filter((day) => day.count === totalParticipants).length
+
+    windows.push({
+      startDate: slice[0].date.toISOString(),
+      endDate: slice[slice.length - 1].date.toISOString(),
+      averageAvailable: totalAvailable / slice.length,
+      perfectDays,
+    })
+  }
+
+  return windows
+    .sort((a, b) => {
+      if (b.averageAvailable !== a.averageAvailable) return b.averageAvailable - a.averageAvailable
+      if (b.perfectDays !== a.perfectDays) return b.perfectDays - a.perfectDays
+      return new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
+    })
+    .slice(0, 3)
+}
+
+function buildTripPlanSuggestions(trip: TripWithResponses): TripPlanSuggestions {
+  const tripStart = normalizeDate(trip.startDate)
+  const tripEnd = normalizeDate(trip.endDate)
+  const suggestedDurationDays = Math.min(
+    4,
+    Math.max(1, Math.floor((tripEnd.getTime() - tripStart.getTime()) / (1000 * 60 * 60 * 24)) + 1),
+  )
+
+  return {
+    topDestinations: countLabels(trip.responses.flatMap((response) => response.destinations)).slice(0, 4),
+    commonInterests: countLabels(trip.responses.flatMap((response) => response.interests)).slice(0, 4),
+    budgetPreferences: countLabels(trip.responses.map((response) => response.budget).filter(Boolean)).slice(0, 4),
+    bestDateWindows: getDateWindowSuggestions(trip),
+    suggestedDurationDays,
+  }
+}
+
+async function ensureTripPlan(tripId: string) {
+  const trip = await prisma.trip.findUnique({
+    where: { id: tripId },
+    include: {
+      destinationOptions: {
+        orderBy: {
+          createdAt: 'asc',
+        },
+      },
+      responses: {
+        orderBy: {
+          submittedAt: 'asc',
+        },
+      },
+      plan: {
+        include: {
+          todos: {
+            orderBy: {
+              createdAt: 'asc',
+            },
+          },
+        },
+      },
+    },
+  })
+
+  if (!trip) {
+    return null
+  }
+
+  if (trip.plan) {
+    return trip
+  }
+
+  const createdPlan = await prisma.tripPlan.create({
+    data: {
+      id: generateId(10),
+      tripId,
+      finalDestination: '',
+      finalStartDate: null,
+      finalEndDate: null,
+      itineraryIdeas: '',
+      lodgingNotes: '',
+      transportationNotes: '',
+      budgetNotes: '',
+      groupNotes: '',
+    },
+    include: {
+      todos: {
+        orderBy: {
+          createdAt: 'asc',
+        },
+      },
+    },
+  })
+
+  return {
+    ...trip,
+    plan: createdPlan,
+  }
+}
+
 export async function createTrip(input: CreateTripInput): Promise<TripRecord> {
   const name = input.name.trim()
 
@@ -148,10 +402,7 @@ export async function getTripWithResponses(tripId: string): Promise<TripWithResp
     return null
   }
 
-  return {
-    ...mapTripRecord(trip),
-    responses: trip.responses.map(mapResponseRecord),
-  }
+  return mapTripWithResponses(trip)
 }
 
 async function syncTripDestinationOptions(tripId: string, destinations: string[]) {
@@ -352,6 +603,159 @@ export async function recoverResponse(tripId: string, input: RecoverResponseInpu
   }
 
   return mapResponseRecord(matchingName)
+}
+
+export async function getTripPlanPageData(tripId: string): Promise<TripPlanPageData | null> {
+  const trip = await ensureTripPlan(tripId)
+
+  if (!trip || !trip.plan) {
+    return null
+  }
+
+  const tripWithResponses = mapTripWithResponses(trip)
+
+  return {
+    trip: tripWithResponses,
+    plan: mapTripPlanRecord(trip.plan),
+    suggestions: buildTripPlanSuggestions(tripWithResponses),
+  }
+}
+
+export async function updateTripPlan(tripId: string, input: UpdateTripPlanInput): Promise<TripPlanRecord> {
+  const trip = await ensureTripPlan(tripId)
+
+  if (!trip || !trip.plan) {
+    throw new Error('Trip not found.')
+  }
+
+  const finalDestination = input.finalDestination?.trim()
+  const finalStartDate = input.finalStartDate === undefined ? trip.plan.finalStartDate : input.finalStartDate
+  const finalEndDate = input.finalEndDate === undefined ? trip.plan.finalEndDate : input.finalEndDate
+
+  if (finalStartDate && finalEndDate) {
+    if (normalizeDate(finalStartDate) > normalizeDate(finalEndDate)) {
+      throw new Error('Finalized start date must be before finalized end date.')
+    }
+  }
+
+  const plan = await prisma.tripPlan.update({
+    where: {
+      tripId,
+    },
+    data: {
+      finalDestination: finalDestination ?? trip.plan.finalDestination,
+      finalStartDate: finalStartDate ?? null,
+      finalEndDate: finalEndDate ?? null,
+      itineraryIdeas: input.itineraryIdeas?.trim() ?? trip.plan.itineraryIdeas,
+      lodgingNotes: input.lodgingNotes?.trim() ?? trip.plan.lodgingNotes,
+      transportationNotes: input.transportationNotes?.trim() ?? trip.plan.transportationNotes,
+      budgetNotes: input.budgetNotes?.trim() ?? trip.plan.budgetNotes,
+      groupNotes: input.groupNotes?.trim() ?? trip.plan.groupNotes,
+    },
+    include: {
+      todos: {
+        orderBy: {
+          createdAt: 'asc',
+        },
+      },
+    },
+  })
+
+  return mapTripPlanRecord(plan)
+}
+
+export async function createTripPlanTodo(tripId: string, input: CreateTripPlanTodoInput): Promise<TripPlanTodoRecord> {
+  const trip = await ensureTripPlan(tripId)
+
+  if (!trip || !trip.plan) {
+    throw new Error('Trip not found.')
+  }
+
+  const text = input.text.trim()
+
+  if (!text) {
+    throw new Error('Todo text is required.')
+  }
+
+  const todo = await prisma.tripPlanTodo.create({
+    data: {
+      id: generateId(10),
+      tripPlanId: trip.plan.id,
+      text,
+      completed: false,
+    },
+  })
+
+  return mapTripPlanTodoRecord(todo)
+}
+
+export async function updateTripPlanTodo(
+  tripId: string,
+  todoId: string,
+  input: UpdateTripPlanTodoInput,
+): Promise<TripPlanTodoRecord> {
+  const trip = await ensureTripPlan(tripId)
+
+  if (!trip || !trip.plan) {
+    throw new Error('Trip not found.')
+  }
+
+  const existingTodo = await prisma.tripPlanTodo.findFirst({
+    where: {
+      id: todoId,
+      tripPlanId: trip.plan.id,
+    },
+  })
+
+  if (!existingTodo) {
+    throw new Error('Todo not found.')
+  }
+
+  const nextText = input.text === undefined ? existingTodo.text : input.text.trim()
+
+  if (!nextText) {
+    throw new Error('Todo text is required.')
+  }
+
+  const todo = await prisma.tripPlanTodo.update({
+    where: {
+      id: todoId,
+    },
+    data: {
+      text: nextText,
+      completed: input.completed ?? existingTodo.completed,
+    },
+  })
+
+  return mapTripPlanTodoRecord(todo)
+}
+
+export async function deleteTripPlanTodo(tripId: string, todoId: string): Promise<void> {
+  const trip = await ensureTripPlan(tripId)
+
+  if (!trip || !trip.plan) {
+    throw new Error('Trip not found.')
+  }
+
+  const existingTodo = await prisma.tripPlanTodo.findFirst({
+    where: {
+      id: todoId,
+      tripPlanId: trip.plan.id,
+    },
+    select: {
+      id: true,
+    },
+  })
+
+  if (!existingTodo) {
+    throw new Error('Todo not found.')
+  }
+
+  await prisma.tripPlanTodo.delete({
+    where: {
+      id: todoId,
+    },
+  })
 }
 
 const DEFAULT_DESTINATION_OPTIONS = [

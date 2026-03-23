@@ -329,10 +329,12 @@ export default function EventPage() {
         <div className="flex flex-col gap-6">
           {/* Top Bar */}
           <EventTopBar
+            tripId={tripId}
             tripName={trip.name}
             dateRange={formatDateRange(new Date(trip.startDate), new Date(trip.endDate))}
             responseCount={participants.length}
             shareUrl={shareUrl}
+            activeTab="responses"
           />
 
           {/* Main Content - Two Column Layout */}
