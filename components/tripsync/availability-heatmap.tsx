@@ -25,6 +25,12 @@ interface DateRangeOption {
   minAvailable: number
 }
 
+interface MonthSection {
+  key: string
+  label: string
+  weeks: DayData[][]
+}
+
 export function AvailabilityHeatmap({ participants, tripDateRange, tripDurationDays }: AvailabilityHeatmapProps) {
   const [activeWindowKey, setActiveWindowKey] = useState<string | null>(null)
 
@@ -62,49 +68,69 @@ export function AvailabilityHeatmap({ participants, tripDateRange, tripDurationD
     return days
   }, [participants, tripDateRange])
 
-  // Group days by week for grid display
-  const weeks = useMemo(() => {
-    const result: DayData[][] = []
-    let currentWeek: DayData[] = []
-    
-    // Pad start to align with day of week (0 = Sunday)
-    if (heatmapData.length > 0) {
-      const firstDay = heatmapData[0].date.getDay()
-      for (let i = 0; i < firstDay; i++) {
-        currentWeek.push({ date: new Date(0), count: -1, total: 0, percentage: 0 })
-      }
-    }
-
-    heatmapData.forEach((day) => {
-      currentWeek.push(day)
-      if (currentWeek.length === 7) {
-        result.push(currentWeek)
-        currentWeek = []
-      }
-    })
-
-    // Pad end
-    if (currentWeek.length > 0) {
-      while (currentWeek.length < 7) {
-        currentWeek.push({ date: new Date(0), count: -1, total: 0, percentage: 0 })
-      }
-      result.push(currentWeek)
-    }
-
-    return result
-  }, [heatmapData])
-
   // Get intensity color based on percentage
-  const getIntensityClass = (percentage: number) => {
+  const getIntensityClass = (percentage: number, useNeutralScale: boolean) => {
+    if (useNeutralScale) {
+      if (percentage === 0) return 'bg-muted/20'
+      return 'bg-primary/20'
+    }
     if (percentage === 0) return 'bg-muted/30'
-    if (percentage <= 25) return 'bg-primary/20'
-    if (percentage <= 50) return 'bg-primary/40'
-    if (percentage <= 75) return 'bg-primary/60'
-    return 'bg-primary/90'
+    if (percentage <= 25) return 'bg-primary/15'
+    if (percentage <= 50) return 'bg-primary/35'
+    if (percentage <= 75) return 'bg-primary/55'
+    return 'bg-primary/80'
   }
 
   const dayLabels = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
   const suggestedDuration = Math.min(tripDurationDays ?? 4, Math.max(1, heatmapData.length))
+  const hasUniformAvailability = useMemo(() => {
+    if (heatmapData.length <= 1) return false
+    return heatmapData.every((day) => day.count === heatmapData[0].count)
+  }, [heatmapData])
+
+  const monthSections = useMemo<MonthSection[]>(() => {
+    if (heatmapData.length === 0) return []
+
+    const sections = new Map<string, DayData[]>()
+
+    heatmapData.forEach((day) => {
+      const key = `${day.date.getFullYear()}-${day.date.getMonth()}`
+      const existing = sections.get(key) ?? []
+      existing.push(day)
+      sections.set(key, existing)
+    })
+
+    return Array.from(sections.entries()).map(([key, days]) => {
+      const weeks: DayData[][] = []
+      let currentWeek: DayData[] = []
+      const firstDayOfMonth = days[0].date.getDay()
+
+      for (let index = 0; index < firstDayOfMonth; index += 1) {
+        currentWeek.push({ date: new Date(0), count: -1, total: 0, percentage: 0 })
+      }
+
+      days.forEach((day) => {
+        currentWeek.push(day)
+        if (currentWeek.length === 7) {
+          weeks.push(currentWeek)
+          currentWeek = []
+        }
+      })
+
+      if (currentWeek.length > 0) {
+        while (currentWeek.length < 7) {
+          currentWeek.push({ date: new Date(0), count: -1, total: 0, percentage: 0 })
+        }
+        weeks.push(currentWeek)
+      }
+
+      return {
+        key,
+        label: days[0].date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+        weeks,
+      }
+    })
+  }, [heatmapData])
 
   const bestWindows = useMemo(() => {
     if (participants.length === 0 || heatmapData.length === 0 || suggestedDuration > heatmapData.length) {
@@ -124,6 +150,10 @@ export function AvailabilityHeatmap({ participants, tripDateRange, tripDurationD
         score: totalAvailable,
         minAvailable,
       })
+    }
+
+    if (hasUniformAvailability) {
+      return pickSpreadWindows(windows)
     }
 
     const sorted = windows
@@ -148,9 +178,8 @@ export function AvailabilityHeatmap({ participants, tripDateRange, tripDurationD
         break
       }
     }
-
     return distinct
-  }, [heatmapData, participants.length, suggestedDuration])
+  }, [hasUniformAvailability, heatmapData, participants.length, suggestedDuration])
 
   const activeWindow = useMemo(() => {
     if (!bestWindows.length) return null
@@ -188,6 +217,11 @@ export function AvailabilityHeatmap({ participants, tripDateRange, tripDurationD
               <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Best Dates to Go
               </p>
+              {hasUniformAvailability && (
+                <p className="mb-3 text-xs text-muted-foreground">
+                  Availability looks almost the same across this range, so these are spread-out options to compare.
+                </p>
+              )}
               <div className="space-y-2">
                 {bestWindows.map((window, index) => (
                   <div
@@ -221,48 +255,54 @@ export function AvailabilityHeatmap({ participants, tripDateRange, tripDurationD
             </div>
           )}
 
-          {/* Day labels */}
-          <div className="grid grid-cols-7 gap-1">
-            {dayLabels.map((label, i) => (
-              <div key={i} className="text-center text-xs font-medium text-muted-foreground">
-                {label}
-              </div>
-            ))}
-          </div>
+          <div className="grid gap-4 xl:grid-cols-2">
+            {monthSections.map((section) => (
+              <div key={section.key} className="rounded-xl border border-border/50 bg-background p-3">
+                <div className="mb-3 flex items-center justify-between">
+                  <p className="text-sm font-semibold text-foreground">{section.label}</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    {participants.length} traveler{participants.length === 1 ? '' : 's'}
+                  </p>
+                </div>
 
-          {/* Heatmap grid */}
-          <div className="flex flex-col gap-1">
-            {weeks.map((week, weekIndex) => (
-              <div key={weekIndex} className="grid grid-cols-7 gap-1">
-                {week.map((day, dayIndex) => {
-                  if (day.count === -1) {
-                    return <div key={dayIndex} className="aspect-square max-h-9 rounded-sm" />
-                  }
-                  const isFirstOfMonth =
-                    day.date.getDate() === 1 ||
-                    day.date.getTime() === heatmapData[0]?.date.getTime()
-                  const isHighlighted =
-                    activeWindow &&
-                    day.date >= activeWindow.start &&
-                    day.date <= activeWindow.end
-
-                  return (
-                    <div
-                      key={dayIndex}
-                      className={`relative flex aspect-square max-h-11 min-h-10 flex-col items-center justify-center rounded-md border text-[11px] font-medium transition-all cursor-default ${
-                        isHighlighted ? 'border-primary ring-2 ring-primary/20' : 'border-transparent'
-                      } ${getIntensityClass(day.percentage)} ${day.percentage >= 75 ? 'text-primary-foreground' : 'text-foreground/80'}`}
-                      title={`${day.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}: ${day.count}/${day.total} available`}
-                    >
-                      {isFirstOfMonth && (
-                        <span className={`text-[9px] font-semibold uppercase tracking-wide ${day.percentage >= 75 ? 'text-primary-foreground/90' : 'text-muted-foreground'}`}>
-                          {day.date.toLocaleDateString('en-US', { month: 'short' })}
-                        </span>
-                      )}
-                      <span>{day.date.getDate()}</span>
+                <div className="grid grid-cols-7 gap-1">
+                  {dayLabels.map((label, index) => (
+                    <div key={`${section.key}-${label}-${index}`} className="text-center text-[11px] font-medium text-muted-foreground">
+                      {label}
                     </div>
-                  )
-                })}
+                  ))}
+                </div>
+
+                <div className="mt-2 flex flex-col gap-1">
+                  {section.weeks.map((week, weekIndex) => (
+                    <div key={`${section.key}-week-${weekIndex}`} className="grid grid-cols-7 gap-1">
+                      {week.map((day, dayIndex) => {
+                        if (day.count === -1) {
+                          return <div key={`${section.key}-empty-${weekIndex}-${dayIndex}`} className="aspect-square rounded-sm" />
+                        }
+
+                        const isHighlighted =
+                          activeWindow &&
+                          day.date >= activeWindow.start &&
+                          day.date <= activeWindow.end
+
+                        return (
+                          <div
+                            key={`${section.key}-${day.date.toISOString()}`}
+                            className={`relative flex aspect-square min-h-9 items-center justify-center rounded-md border text-[11px] font-medium transition-all ${
+                              isHighlighted ? 'border-primary ring-2 ring-primary/20' : 'border-transparent'
+                            } ${getIntensityClass(day.percentage, hasUniformAvailability)} ${
+                              day.percentage >= 75 && !hasUniformAvailability ? 'text-primary-foreground' : 'text-foreground/80'
+                            }`}
+                            title={`${day.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}: ${day.count}/${day.total} available`}
+                          >
+                            {day.date.getDate()}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  ))}
+                </div>
               </div>
             ))}
           </div>
@@ -287,4 +327,30 @@ export function AvailabilityHeatmap({ participants, tripDateRange, tripDurationD
 
 function getWindowKey(window: { start: Date; end: Date }) {
   return `${window.start.toISOString()}-${window.end.toISOString()}`
+}
+
+function pickSpreadWindows(windows: DateRangeOption[]) {
+  if (windows.length <= 3) {
+    return windows
+  }
+
+  const candidateIndexes = [0, Math.floor((windows.length - 1) / 2), windows.length - 1]
+  const spread = candidateIndexes.map((index) => windows[index])
+  const distinct: DateRangeOption[] = []
+
+  for (const window of spread) {
+    const overlapsExisting = distinct.some((existing) => {
+      return window.start <= existing.end && window.end >= existing.start
+    })
+
+    if (!overlapsExisting) {
+      distinct.push(window)
+    }
+  }
+
+  if (distinct.length >= 2) {
+    return distinct
+  }
+
+  return windows.filter((window, index) => index % Math.max(1, Math.floor(windows.length / 3)) === 0).slice(0, 3)
 }
