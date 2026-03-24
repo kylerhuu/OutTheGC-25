@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { CalendarDays, CheckSquare, Loader2, MapPinned, NotebookPen, PlaneTakeoff } from 'lucide-react'
 import { EventTopBar } from '@/components/tripsync/event-top-bar'
-import { TripIdeasTab } from '@/components/tripsync/trip-ideas-tab'
+import { TripIdeasTab, type IdeaGroupKey } from '@/components/tripsync/trip-ideas-tab'
 import { TripSnapshot } from '@/components/tripsync/trip-snapshot'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -80,6 +80,7 @@ export default function PlanPage() {
   const [isAddingTodo, setIsAddingTodo] = useState(false)
   const [busyTodoId, setBusyTodoId] = useState<string | null>(null)
   const [activePlannerTab, setActivePlannerTab] = useState<'ideas' | 'plan'>('plan')
+  const [highlightedPlanField, setHighlightedPlanField] = useState<keyof UpdateTripPlanInput | null>(null)
 
   const loadPlan = useCallback(async () => {
     setIsLoading(true)
@@ -119,6 +120,16 @@ export default function PlanPage() {
     void loadPlan()
   }, [loadPlan])
 
+  useEffect(() => {
+    if (!highlightedPlanField) return
+
+    const timeout = window.setTimeout(() => {
+      setHighlightedPlanField(null)
+    }, 2500)
+
+    return () => window.clearTimeout(timeout)
+  }, [highlightedPlanField])
+
   const shareUrl = useMemo(() => {
     if (typeof window === 'undefined') {
       return `${process.env.NEXT_PUBLIC_BASE_URL || 'https://outthegc.app'}/plan/${tripId}`
@@ -150,9 +161,7 @@ export default function PlanPage() {
     setSaveError(null)
   }
 
-  const handleSavePlan = async () => {
-    if (!draft) return
-
+  const savePlan = useCallback(async (nextDraft: UpdateTripPlanInput) => {
     setIsSaving(true)
     setSaveError(null)
     setSaveMessage(null)
@@ -163,7 +172,7 @@ export default function PlanPage() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(draft),
+        body: JSON.stringify(nextDraft),
       })
 
       const payload = (await response.json()) as PlanSavePayload
@@ -184,12 +193,66 @@ export default function PlanPage() {
         groupNotes: payload.plan.groupNotes,
       })
       setSaveMessage('Plan saved.')
+      return payload.plan
     } catch (error) {
-      setSaveError(error instanceof Error ? error.message : 'Unable to save plan.')
+      const message = error instanceof Error ? error.message : 'Unable to save plan.'
+      setSaveError(message)
+      throw new Error(message)
     } finally {
       setIsSaving(false)
     }
+  }, [tripId])
+
+  const handleSavePlan = async () => {
+    if (!draft) return
+    await savePlan(draft)
   }
+
+  const handleAddIdeaToPlan = useCallback(
+    async (group: IdeaGroupKey, text: string) => {
+      if (!draft) {
+        throw new Error('Plan is not ready yet.')
+      }
+
+      const trimmedText = text.trim()
+      if (!trimmedText) {
+        return { added: false }
+      }
+
+      const field: keyof UpdateTripPlanInput =
+        group === 'stays'
+          ? 'lodgingNotes'
+          : group === 'transport'
+            ? 'transportationNotes'
+            : group === 'misc'
+              ? 'groupNotes'
+              : 'itineraryIdeas'
+
+      const currentValue = (draft[field] ?? '').trim()
+      const existingLines = currentValue
+        .split('\n')
+        .map((line) => line.replace(/^[-*]\s*/, '').trim().toLowerCase())
+        .filter(Boolean)
+
+      if (existingLines.includes(trimmedText.toLowerCase())) {
+        return { added: false }
+      }
+
+      const bullet = `- ${trimmedText}`
+      const nextValue = currentValue ? `${currentValue}\n${bullet}` : bullet
+      const nextDraft = {
+        ...draft,
+        [field]: nextValue,
+      }
+
+      setDraft(nextDraft)
+      await savePlan(nextDraft)
+      setActivePlannerTab('plan')
+      setHighlightedPlanField(field)
+      return { added: true }
+    },
+    [draft, savePlan],
+  )
 
   const handleAddTodo = async () => {
     if (!newTodo.trim()) {
@@ -366,7 +429,7 @@ export default function PlanPage() {
         </div>
 
         {activePlannerTab === 'ideas' ? (
-          <TripIdeasTab />
+          <TripIdeasTab onAddToPlan={handleAddIdeaToPlan} />
         ) : (
         <Card className="border-border/60 bg-card shadow-sm">
           <CardHeader className="pb-4">
@@ -428,7 +491,13 @@ export default function PlanPage() {
 
             {/* Planning sections — cleaner 2-col layout */}
             <div className="grid gap-5 lg:grid-cols-2">
-              <div className="rounded-2xl border border-border bg-card p-6">
+              <div
+                className={`rounded-2xl border bg-card p-6 transition-all ${
+                  highlightedPlanField === 'lodgingNotes' || highlightedPlanField === 'transportationNotes'
+                    ? 'border-primary ring-2 ring-primary/20 shadow-sm'
+                    : 'border-border'
+                }`}
+              >
                 <div className="mb-5 flex items-center gap-2">
                   <PlaneTakeoff className="size-5 text-primary shrink-0" />
                   <div>
@@ -458,7 +527,13 @@ export default function PlanPage() {
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-border bg-card p-6">
+              <div
+                className={`rounded-2xl border bg-card p-6 transition-all ${
+                  highlightedPlanField === 'itineraryIdeas' || highlightedPlanField === 'groupNotes'
+                    ? 'border-primary ring-2 ring-primary/20 shadow-sm'
+                    : 'border-border'
+                }`}
+              >
                 <div className="mb-5 flex items-center gap-2">
                   <NotebookPen className="size-5 text-primary shrink-0" />
                   <div>

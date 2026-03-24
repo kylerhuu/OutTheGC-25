@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 
-type IdeaGroupKey = 'stays' | 'places' | 'food' | 'transport' | 'misc'
+export type IdeaGroupKey = 'stays' | 'places' | 'food' | 'transport' | 'misc'
 
 interface IdeaItem {
   id: string
@@ -34,7 +34,11 @@ const EMPTY_GROUPS: OrganizedIdeas = {
   misc: [],
 }
 
-export function TripIdeasTab() {
+interface TripIdeasTabProps {
+  onAddToPlan: (group: IdeaGroupKey, text: string, ideaId: string) => Promise<{ added: boolean }>
+}
+
+export function TripIdeasTab({ onAddToPlan }: TripIdeasTabProps) {
   const [rawIdeas, setRawIdeas] = useState('')
   const [organizedIdeas, setOrganizedIdeas] = useState<OrganizedIdeas>(EMPTY_GROUPS)
   const [addedIdeaIds, setAddedIdeaIds] = useState<string[]>([])
@@ -55,12 +59,29 @@ export function TripIdeasTab() {
     }))
   }
 
-  const handleAddToPlan = (ideaId: string) => {
-    setAddedIdeaIds((current) => (current.includes(ideaId) ? current : [...current, ideaId]))
-    toast({
-      title: 'Added to plan',
-      description: 'Saved in local state for now.',
-    })
+  const handleAddToPlan = async (group: IdeaGroupKey, ideaId: string, text: string) => {
+    try {
+      const result = await onAddToPlan(group, text, ideaId)
+
+      if (!result.added) {
+        toast({
+          title: 'Already in plan',
+          description: 'That idea was already saved in the matching plan section.',
+        })
+        return
+      }
+
+      setAddedIdeaIds((current) => (current.includes(ideaId) ? current : [...current, ideaId]))
+      toast({
+        title: 'Added to plan',
+        description: 'Saved to the matching plan section.',
+      })
+    } catch (error) {
+      toast({
+        title: 'Could not add idea',
+        description: error instanceof Error ? error.message : 'Please try again.',
+      })
+    }
   }
 
   return (
@@ -129,7 +150,7 @@ export function TripIdeasTab() {
                                 type="button"
                                 size="sm"
                                 variant={isAdded ? 'outline' : 'default'}
-                                onClick={() => handleAddToPlan(item.id)}
+                                onClick={() => void handleAddToPlan(group, item.id, item.text)}
                                 disabled={isAdded}
                               >
                                 <Plus className="mr-1.5 size-3.5" />
