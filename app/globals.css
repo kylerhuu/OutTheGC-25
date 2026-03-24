@@ -163,7 +163,8 @@
     @apply transition-all duration-150 ease-out;
   }
   .hover-lift:hover {
-    @apply -translate-y-1 shadow-base;
+    transform: translateY(-4px);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
   }
 
   /* Featured card elevation */
