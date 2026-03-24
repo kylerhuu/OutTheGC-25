@@ -12,7 +12,7 @@ interface EventTopBarProps {
   dateRange: string
   responseCount: number
   shareUrl: string
-  activeTab?: 'responses' | 'plan'
+  activeTab?: 'responses' | 'results' | 'plan'
 }
 
 export function EventTopBar({
@@ -25,6 +25,7 @@ export function EventTopBar({
 }: EventTopBarProps) {
   const tabs = [
     { key: 'responses', label: 'Responses', href: `/event/${tripId}` },
+    { key: 'results', label: 'Results', href: `/results/${tripId}` },
     { key: 'plan', label: 'Plan', href: `/plan/${tripId}` },
   ] as const
 

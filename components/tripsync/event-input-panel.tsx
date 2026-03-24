@@ -65,7 +65,7 @@ interface EventInputPanelProps {
   hasSubmitted?: boolean
   editingParticipant?: ParticipantData | null
   onEditSubmission?: () => void
-  onViewCalendar?: () => void
+  onViewResults?: () => void
   onGoToPlanning?: () => void
   savedEditCode?: string | null
 }
@@ -78,7 +78,7 @@ export function EventInputPanel({
   hasSubmitted = false,
   editingParticipant,
   onEditSubmission,
-  onViewCalendar,
+  onViewResults,
   onGoToPlanning,
   savedEditCode,
 }: EventInputPanelProps) {
@@ -244,14 +244,14 @@ export function EventInputPanel({
           )}
           
           <div className="flex flex-col gap-3 w-full max-w-sm">
-            {onViewCalendar && (
+            {onViewResults && (
               <Button
                 variant="default"
-                onClick={onViewCalendar}
+                onClick={onViewResults}
                 className="w-full gap-2"
               >
                 <Eye className="size-4" />
-                View Results
+                View Group Results
               </Button>
             )}
             {onEditSubmission && (

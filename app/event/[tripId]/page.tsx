@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
+import { useState, useMemo, useCallback, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import type { DateRange } from 'react-day-picker'
 import { EventTopBar } from '@/components/tripsync/event-top-bar'
@@ -96,7 +96,6 @@ export default function EventPage() {
   const [selectedParticipantId, setSelectedParticipantId] = useState<string | null>(null)
   const [editingParticipant, setEditingParticipant] = useState<ParticipantData | null>(null)
   const [savedEditCode, setSavedEditCode] = useState<string | null>(null)
-  const availabilitySectionRef = useRef<HTMLDivElement>(null)
 
   const loadTrip = useCallback(async () => {
     setIsLoading(true)
@@ -270,10 +269,9 @@ export default function EventPage() {
   }, [participants])
 
   // Reset to view mode (after submission)
-  const handleViewCalendar = useCallback(() => {
-    setSelectedParticipantId((current) => current ?? participants[0]?.id ?? null)
-    availabilitySectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  }, [participants])
+  const handleViewResults = useCallback(() => {
+    window.location.href = `/results/${tripId}`
+  }, [tripId])
 
   const handleGoToPlanning = useCallback(() => {
     window.location.href = `/plan/${tripId}`
@@ -340,7 +338,6 @@ export default function EventPage() {
 
           {/* Main Content - Two Column Layout */}
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-            {/* Input Panel - 3/5 width on desktop */}
             <div className="lg:col-span-3">
               <EventInputPanel
                 tripDateRange={{ from: new Date(trip.startDate), to: new Date(trip.endDate) }}
@@ -350,22 +347,19 @@ export default function EventPage() {
                 hasSubmitted={hasSubmitted}
                 editingParticipant={editingParticipant}
                 onEditSubmission={currentUserId ? () => handleEditSubmission(currentUserId) : undefined}
-                onViewCalendar={handleViewCalendar}
+                onViewResults={handleViewResults}
                 onGoToPlanning={handleGoToPlanning}
                 savedEditCode={savedEditCode}
               />
             </div>
 
-            {/* Summary Panel - 2/5 width on desktop */}
             <div className="lg:col-span-2">
               <EventSummaryPanel
                 participants={participants}
-                tripDateRange={{ from: new Date(trip.startDate), to: new Date(trip.endDate) }}
                 selectedParticipantId={selectedParticipantId}
                 onSelectParticipant={setSelectedParticipantId}
                 currentUserId={currentUserId}
                 onEditParticipant={handleEditSubmission}
-                availabilitySectionRef={availabilitySectionRef}
               />
             </div>
           </div>
