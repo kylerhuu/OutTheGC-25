@@ -182,7 +182,13 @@ export function TripIdeasTab({ context, onAddToPlan, onAddManyToPlan }: TripIdea
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ text: sourceText.trim(), mode, intent, context }),
+        body: JSON.stringify({
+          text: sourceText.trim(),
+          mode,
+          intent,
+          context,
+          inputHints: buildInputHints(sourceText),
+        }),
       })
 
       const payload = (await response.json()) as {
@@ -1060,6 +1066,40 @@ function inferDetectedStructure(rawIdeas: string, sections: SuggestedItinerarySe
   }
 
   if (extractStructuredSections(rawIdeas).length > 0) {
+    return 'locations'
+  }
+
+  return 'loose'
+}
+
+function buildInputHints(text: string) {
+  const explicitDayCount = extractExplicitDaySections(text).length
+  const sectionHeadingCount = extractStructuredSections(text).length
+  const urlCount = (text.match(/https?:\/\//gi) ?? []).length
+
+  return {
+    likelyStructure: inferLikelyStructureFromText(text),
+    explicitDayCount,
+    sectionHeadingCount,
+    urlCount,
+  }
+}
+
+function inferLikelyStructureFromText(text: string): DetectedStructure {
+  const explicitDayCount = extractExplicitDaySections(text).length
+  const structuredCount = extractStructuredSections(text).length
+  const locationSignals = (text.match(/\b(station|district|neighborhood|area|city|temple|park|museum|beach|market)\b/gi) ?? [])
+    .length
+
+  if (explicitDayCount > 0 && structuredCount > 0) {
+    return 'mixed'
+  }
+
+  if (explicitDayCount > 0) {
+    return 'days'
+  }
+
+  if (structuredCount > 0 || locationSignals >= 4) {
     return 'locations'
   }
 

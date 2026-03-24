@@ -13,6 +13,14 @@ const requestSchema = z.object({
       'turn_into_final_doc',
     ])
     .optional(),
+  inputHints: z
+    .object({
+      likelyStructure: z.enum(['days', 'locations', 'mixed', 'loose']).optional(),
+      explicitDayCount: z.number().int().nonnegative().optional(),
+      sectionHeadingCount: z.number().int().nonnegative().optional(),
+      urlCount: z.number().int().nonnegative().optional(),
+    })
+    .optional(),
   context: z
     .object({
       tripName: z.string().optional(),
@@ -78,8 +86,8 @@ export async function POST(request: Request) {
       },
       body: JSON.stringify({
         model: process.env.OPENAI_IDEAS_MODEL || 'gpt-4o-mini',
-        instructions: buildInstructions(body.mode, body.intent, body.context),
-        input: buildInputPayload(body.text, body.context),
+        instructions: buildInstructions(body.mode, body.intent, body.context, body.inputHints),
+        input: buildInputPayload(body.text, body.context, body.intent, body.inputHints),
         text: {
           format: {
             type: 'json_schema',
@@ -277,6 +285,7 @@ function buildInstructions(
   mode: z.infer<typeof requestSchema>['mode'],
   intent: z.infer<typeof requestSchema>['intent'],
   context: z.infer<typeof requestSchema>['context'],
+  inputHints: z.infer<typeof requestSchema>['inputHints'],
 ) {
   const base =
     mode === 'build_itinerary'
@@ -295,29 +304,113 @@ function buildInstructions(
           ? ' Shape suggestedPlanSections like a clean shareable trip document. Prefer sections such as Overview, Stay, Transport, Itinerary, and Notes instead of raw categories when that fits the input.'
           : ''
 
-  return `${base}${shared}${intentInstructions}${buildContextInstructions(context)}`
+  const hintInstructions = inputHints
+    ? ` Use these lightweight input hints to save work instead of rediscovering them: likelyStructure=${inputHints.likelyStructure ?? 'unknown'}, explicitDayCount=${inputHints.explicitDayCount ?? 0}, sectionHeadingCount=${inputHints.sectionHeadingCount ?? 0}, urlCount=${inputHints.urlCount ?? 0}.`
+    : ''
+
+  return `${base}${shared}${intentInstructions}${hintInstructions}${buildContextInstructions(context)}`
 }
 
-function buildInputPayload(text: string, context: z.infer<typeof requestSchema>['context']) {
-  if (!context) return text
+function buildInputPayload(
+  text: string,
+  context: z.infer<typeof requestSchema>['context'],
+  intent: z.infer<typeof requestSchema>['intent'],
+  inputHints: z.infer<typeof requestSchema>['inputHints'],
+) {
+  const blocks: string[] = []
 
-  const safeContext = {
-    tripName: context.tripName ?? '',
-    tripDescription: context.tripDescription ?? '',
-    tripStartDate: context.tripStartDate ?? '',
-    tripEndDate: context.tripEndDate ?? '',
-    finalDestination: context.finalDestination ?? '',
-    finalStartDate: context.finalStartDate ?? '',
-    finalEndDate: context.finalEndDate ?? '',
-    durationDays: context.durationDays ?? null,
-    responseCount: context.responseCount ?? null,
-    lodgingNotes: context.lodgingNotes ?? '',
-    transportationNotes: context.transportationNotes ?? '',
-    budgetNotes: context.budgetNotes ?? '',
-    groupNotes: context.groupNotes ?? '',
-    itineraryIdeas: context.itineraryIdeas ?? '',
-    checklist: context.checklist ?? [],
+  const compactContext = buildCompactContext(context, intent)
+  if (compactContext.length > 0) {
+    blocks.push(`Trip context:\n${compactContext.join('\n')}`)
   }
 
-  return `Trip context:\n${JSON.stringify(safeContext, null, 2)}\n\nUser notes:\n${text}`
+  if (inputHints) {
+    const hintLines = [
+      inputHints.likelyStructure ? `Likely structure: ${inputHints.likelyStructure}` : null,
+      typeof inputHints.explicitDayCount === 'number' ? `Explicit day headings: ${inputHints.explicitDayCount}` : null,
+      typeof inputHints.sectionHeadingCount === 'number' ? `Section headings: ${inputHints.sectionHeadingCount}` : null,
+      typeof inputHints.urlCount === 'number' ? `Links pasted: ${inputHints.urlCount}` : null,
+    ].filter(Boolean)
+
+    if (hintLines.length > 0) {
+      blocks.push(`Input hints:\n${hintLines.join('\n')}`)
+    }
+  }
+
+  blocks.push(`User notes:\n${text}`)
+  return blocks.join('\n\n')
+}
+
+function buildCompactContext(
+  context: z.infer<typeof requestSchema>['context'],
+  intent: z.infer<typeof requestSchema>['intent'],
+) {
+  if (!context) return []
+
+  const lines: string[] = []
+  const finalDates =
+    context.finalStartDate && context.finalEndDate
+      ? `${context.finalStartDate.slice(0, 10)} to ${context.finalEndDate.slice(0, 10)}`
+      : null
+  const tripDates =
+    context.tripStartDate && context.tripEndDate
+      ? `${context.tripStartDate.slice(0, 10)} to ${context.tripEndDate.slice(0, 10)}`
+      : null
+
+  pushContextLine(lines, 'Trip', context.tripName)
+  pushContextLine(lines, 'Final destination', context.finalDestination)
+  pushContextLine(lines, 'Final dates', finalDates)
+  pushContextLine(lines, 'Trip dates', tripDates)
+  pushContextLine(lines, 'Duration days', context.durationDays ? String(context.durationDays) : null)
+
+  if (intent !== 'pull_stays_transport') {
+    pushContextLine(lines, 'Response count', typeof context.responseCount === 'number' ? String(context.responseCount) : null)
+  }
+
+  if (intent === 'pull_stays_transport' || intent === 'make_itinerary' || intent === 'turn_into_final_doc') {
+    pushContextLine(lines, 'Existing stay notes', compactText(context.lodgingNotes, 280))
+    pushContextLine(lines, 'Existing transport notes', compactText(context.transportationNotes, 280))
+  }
+
+  if (intent === 'make_itinerary' || intent === 'turn_into_final_doc') {
+    pushContextLine(lines, 'Budget notes', compactText(context.budgetNotes, 180))
+    pushContextLine(lines, 'Existing itinerary notes', compactText(context.itineraryIdeas, 280))
+    pushContextLine(lines, 'Group notes', compactText(context.groupNotes, 180))
+    pushContextLine(lines, 'Checklist', compactList(context.checklist, 4))
+  }
+
+  if (intent === 'organize_notes' || intent === 'group_by_location') {
+    pushContextLine(lines, 'Trip description', compactText(context.tripDescription, 140))
+    pushContextLine(lines, 'Existing itinerary notes', compactText(context.itineraryIdeas, 180))
+  }
+
+  return lines
+}
+
+function compactText(value: string | undefined, maxLength: number) {
+  if (!value) return null
+
+  const normalized = value
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .slice(0, 6)
+    .join(' | ')
+
+  if (!normalized) return null
+  return normalized.length > maxLength ? `${normalized.slice(0, maxLength - 1)}…` : normalized
+}
+
+function compactList(values: string[] | undefined, maxItems: number) {
+  if (!values || values.length === 0) return null
+  return values
+    .map((value) => value.trim())
+    .filter(Boolean)
+    .slice(0, maxItems)
+    .join(' | ')
+}
+
+function pushContextLine(lines: string[], label: string, value: string | null | undefined) {
+  if (!value) return
+  lines.push(`${label}: ${value}`)
 }
