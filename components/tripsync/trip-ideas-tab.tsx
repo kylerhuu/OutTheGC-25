@@ -121,11 +121,24 @@ export function TripIdeasTab({ context, onAddToPlan, onAddManyToPlan }: TripIdea
 
       const nextOrganizedIdeas = convertOrganizedIdeas(payload.organizedIdeas)
       const nextPreservedSections = payload.preservedSections ?? []
+      const explicitDaySections = extractExplicitDaySections(rawIdeas)
+      const normalizedSuggestedSections = normalizeSuggestedPlanSections({
+        rawIdeas,
+        aiSections: payload.suggestedPlanSections ?? [],
+        preservedSections: nextPreservedSections,
+        explicitDaySections,
+        durationDays: context.durationDays,
+      })
       const nextSuggestedItinerary =
-        (payload.suggestedPlanSections ?? []).length > 0
-          ? payload.suggestedPlanSections ?? []
+        normalizedSuggestedSections.length > 0
+          ? normalizedSuggestedSections
           : mode === 'build_itinerary'
-            ? buildFallbackPlanSections(rawIdeas, payload.preservedSections ?? [], context.durationDays)
+            ? buildFallbackPlanSections(
+                rawIdeas,
+                nextPreservedSections,
+                context.durationDays,
+                explicitDaySections,
+              )
             : []
       const nextNotesSummary = payload.notesSummary ?? ''
       const hasAnyOutput =
@@ -173,10 +186,16 @@ export function TripIdeasTab({ context, onAddToPlan, onAddManyToPlan }: TripIdea
       }
 
       if (mode === 'build_itinerary') {
-        const fallbackItinerary = buildFallbackPlanSections(rawIdeas, [], context.durationDays)
+        const explicitDaySections = extractExplicitDaySections(rawIdeas)
+        const fallbackItinerary = buildFallbackPlanSections(
+          rawIdeas,
+          explicitDaySections,
+          context.durationDays,
+          explicitDaySections,
+        )
         if (fallbackItinerary.length > 0) {
           setOrganizedIdeas(EMPTY_GROUPS)
-          setPreservedSections([])
+          setPreservedSections(explicitDaySections)
           setSuggestedItinerary(fallbackItinerary)
           setNotesSummary('A simple fallback itinerary was created because the AI response was empty.')
           setAddedIdeaIds([])
@@ -562,7 +581,16 @@ function categorizeIdea(line: string): IdeaGroupKey {
   return 'misc'
 }
 
-function buildFallbackPlanSections(rawIdeas: string, preservedSections: PreservedSection[], durationDays: number) {
+function buildFallbackPlanSections(
+  rawIdeas: string,
+  preservedSections: PreservedSection[],
+  durationDays: number,
+  explicitDaySections: SuggestedItinerarySection[] = [],
+) {
+  if (explicitDaySections.length > 0) {
+    return explicitDaySections
+  }
+
   if (preservedSections.length > 0) {
     return preservedSections
   }
@@ -589,4 +617,79 @@ function buildFallbackPlanSections(rawIdeas: string, preservedSections: Preserve
   }
 
   return daySections
+}
+
+function extractExplicitDaySections(rawIdeas: string): SuggestedItinerarySection[] {
+  const lines = rawIdeas
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+
+  const sections: SuggestedItinerarySection[] = []
+  let currentSection: SuggestedItinerarySection | null = null
+
+  for (const line of lines) {
+    if (isDayHeading(line)) {
+      currentSection = {
+        title: line.replace(/\s*:\s*$/, ''),
+        items: [],
+      }
+      sections.push(currentSection)
+      continue
+    }
+
+    if (currentSection) {
+      currentSection.items.push(line)
+    }
+  }
+
+  return sections.filter((section) => section.items.length > 0)
+}
+
+function normalizeSuggestedPlanSections({
+  rawIdeas,
+  aiSections,
+  preservedSections,
+  explicitDaySections,
+  durationDays,
+}: {
+  rawIdeas: string
+  aiSections: SuggestedItinerarySection[]
+  preservedSections: PreservedSection[]
+  explicitDaySections: SuggestedItinerarySection[]
+  durationDays: number
+}) {
+  if (explicitDaySections.length > 0) {
+    const aiDaySections = aiSections.filter((section) => isDayHeading(section.title))
+    const aiOverSplit =
+      aiDaySections.length > explicitDaySections.length ||
+      (durationDays > 0 && aiDaySections.length > durationDays)
+
+    if (aiSections.length === 0 || aiOverSplit) {
+      return explicitDaySections
+    }
+
+    if (aiDaySections.length === explicitDaySections.length) {
+      return aiSections
+    }
+
+    return explicitDaySections
+  }
+
+  if (aiSections.length > 0) {
+    const aiDaySections = aiSections.filter((section) => isDayHeading(section.title))
+    if (durationDays > 0 && aiDaySections.length > durationDays) {
+      return preservedSections.length > 0
+        ? preservedSections
+        : buildFallbackPlanSections(rawIdeas, preservedSections, durationDays)
+    }
+
+    return aiSections
+  }
+
+  return []
+}
+
+function isDayHeading(value: string) {
+  return /^day\s+\d+/i.test(value.trim())
 }
