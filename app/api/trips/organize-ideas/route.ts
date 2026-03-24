@@ -4,6 +4,25 @@ import { z } from 'zod'
 const requestSchema = z.object({
   text: z.string().trim().min(1).max(20000),
   mode: z.enum(['organize', 'build_itinerary']).default('organize'),
+  context: z
+    .object({
+      tripName: z.string().optional(),
+      tripDescription: z.string().optional(),
+      tripStartDate: z.string().optional(),
+      tripEndDate: z.string().optional(),
+      finalDestination: z.string().optional(),
+      finalStartDate: z.string().nullable().optional(),
+      finalEndDate: z.string().nullable().optional(),
+      durationDays: z.number().int().positive().optional(),
+      responseCount: z.number().int().nonnegative().optional(),
+      lodgingNotes: z.string().optional(),
+      transportationNotes: z.string().optional(),
+      budgetNotes: z.string().optional(),
+      groupNotes: z.string().optional(),
+      itineraryIdeas: z.string().optional(),
+      checklist: z.array(z.string()).optional(),
+    })
+    .optional(),
 })
 
 const organizedIdeasSchema = z.object({
@@ -20,7 +39,7 @@ const organizedIdeasSchema = z.object({
       items: z.array(z.string()),
     }),
   ),
-  suggestedItinerary: z.array(
+  suggestedPlanSections: z.array(
     z.object({
       title: z.string(),
       items: z.array(z.string()),
@@ -50,9 +69,10 @@ export async function POST(request: Request) {
         model: process.env.OPENAI_IDEAS_MODEL || 'gpt-4o-mini',
         instructions:
           body.mode === 'build_itinerary'
-            ? 'You turn trip notes into a useful planning output. Return only structured JSON. Preserve any existing day-based or section-based structure in preservedSections. Also create suggestedItinerary as a realistic day-by-day trip draft when the user input is broad or unordered. If the user already has a strong itinerary, keep that intent and lightly refine it instead of replacing it. Keep wording close to the user input, but clean obvious clutter. Put each item in exactly one category: stays, places, food, transport, or misc. notesSummary should be 1-2 short sentences that summarize the trip ideas without inventing details.'
-            : 'You organize messy trip-planning notes into categories while preserving useful structure. Return only structured JSON. Keep wording close to the user input, but clean obvious clutter. If the user already organized notes by day, section, or ordered outline, preserve that structure in preservedSections instead of flattening it. Split combined notes into separate concise items when helpful. Put each item in exactly one category: stays, places, food, transport, or misc. For organize mode, suggestedItinerary should be an empty array unless the user already provided a clear itinerary. notesSummary should be 1-2 short sentences that summarize the trip ideas without inventing details.',
-        input: body.text,
+            ? 'You turn trip notes into a useful planning output. Return only structured JSON. Preserve any existing day-based or section-based structure in preservedSections. Also create suggestedPlanSections as the best final planning shape for the input and context. The output does not always need to be by day. If the content is clearly organized by locations, neighborhoods, things to see, transport steps, or another useful structure, use that instead. If the content already has a strong itinerary, keep that intent and lightly refine it instead of replacing it. If the trip has a known duration, do not compress a long multi-day itinerary into a few generic days. Keep wording close to the user input, but clean obvious clutter. Put each item in exactly one category: stays, places, food, transport, or misc. notesSummary should be 1-2 short sentences that summarize the trip ideas without inventing details.'
+            : 'You organize messy trip-planning notes into categories while preserving useful structure. Return only structured JSON. Keep wording close to the user input, but clean obvious clutter. If the user already organized notes by day, section, or ordered outline, preserve that structure in preservedSections instead of flattening it. Split combined notes into separate concise items when helpful. Put each item in exactly one category: stays, places, food, transport, or misc. For organize mode, suggestedPlanSections should usually be empty unless the user already provided a clear planning structure that should be mirrored. notesSummary should be 1-2 short sentences that summarize the trip ideas without inventing details.'
+            + buildContextInstructions(body.context),
+        input: buildInputPayload(body.text, body.context),
         text: {
           format: {
             type: 'json_schema',
@@ -104,7 +124,7 @@ export async function POST(request: Request) {
                     required: ['title', 'items'],
                   },
                 },
-                suggestedItinerary: {
+                suggestedPlanSections: {
                   type: 'array',
                   items: {
                     type: 'object',
@@ -121,7 +141,7 @@ export async function POST(request: Request) {
                 },
                 notesSummary: { type: 'string' },
               },
-              required: ['organizedIdeas', 'preservedSections', 'suggestedItinerary', 'notesSummary'],
+              required: ['organizedIdeas', 'preservedSections', 'suggestedPlanSections', 'notesSummary'],
             },
           },
         },
@@ -226,4 +246,34 @@ function extractRefusal(payload: unknown) {
   }
 
   return null
+}
+
+function buildContextInstructions(context: z.infer<typeof requestSchema>['context']) {
+  if (!context) return ''
+
+  return `\nUse the provided trip context when it helps: preserve dates, destination, lodging, transport, budget, and existing planning notes. Respect the real trip duration when deciding whether a plan should be split by days or by another structure. Do not throw away meaningful details from the user input just because they do not fit a simple category.`
+}
+
+function buildInputPayload(text: string, context: z.infer<typeof requestSchema>['context']) {
+  if (!context) return text
+
+  const safeContext = {
+    tripName: context.tripName ?? '',
+    tripDescription: context.tripDescription ?? '',
+    tripStartDate: context.tripStartDate ?? '',
+    tripEndDate: context.tripEndDate ?? '',
+    finalDestination: context.finalDestination ?? '',
+    finalStartDate: context.finalStartDate ?? '',
+    finalEndDate: context.finalEndDate ?? '',
+    durationDays: context.durationDays ?? null,
+    responseCount: context.responseCount ?? null,
+    lodgingNotes: context.lodgingNotes ?? '',
+    transportationNotes: context.transportationNotes ?? '',
+    budgetNotes: context.budgetNotes ?? '',
+    groupNotes: context.groupNotes ?? '',
+    itineraryIdeas: context.itineraryIdeas ?? '',
+    checklist: context.checklist ?? [],
+  }
+
+  return `Trip context:\n${JSON.stringify(safeContext, null, 2)}\n\nUser notes:\n${text}`
 }

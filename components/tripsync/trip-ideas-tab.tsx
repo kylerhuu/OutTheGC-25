@@ -27,6 +27,24 @@ interface SuggestedItinerarySection {
   items: string[]
 }
 
+interface TripIdeasContext {
+  tripName: string
+  tripDescription: string
+  tripStartDate: string
+  tripEndDate: string
+  finalDestination: string
+  finalStartDate: string | null
+  finalEndDate: string | null
+  durationDays: number
+  responseCount: number
+  lodgingNotes: string
+  transportationNotes: string
+  budgetNotes: string
+  groupNotes: string
+  itineraryIdeas: string
+  checklist: string[]
+}
+
 type OrganizedIdeas = Record<IdeaGroupKey, IdeaItem[]>
 
 const GROUP_LABELS: Record<IdeaGroupKey, string> = {
@@ -46,6 +64,7 @@ const EMPTY_GROUPS: OrganizedIdeas = {
 }
 
 interface TripIdeasTabProps {
+  context: TripIdeasContext
   onAddToPlan: (group: IdeaGroupKey, text: string, ideaId: string) => Promise<{ added: boolean }>
   onAddManyToPlan: (items: Array<{ group: IdeaGroupKey; text: string; ideaId: string }>) => Promise<{
     addedCount: number
@@ -53,7 +72,7 @@ interface TripIdeasTabProps {
   }>
 }
 
-export function TripIdeasTab({ onAddToPlan, onAddManyToPlan }: TripIdeasTabProps) {
+export function TripIdeasTab({ context, onAddToPlan, onAddManyToPlan }: TripIdeasTabProps) {
   const [rawIdeas, setRawIdeas] = useState('')
   const [organizedIdeas, setOrganizedIdeas] = useState<OrganizedIdeas>(EMPTY_GROUPS)
   const [preservedSections, setPreservedSections] = useState<PreservedSection[]>([])
@@ -85,13 +104,13 @@ export function TripIdeasTab({ onAddToPlan, onAddManyToPlan }: TripIdeasTabProps
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ text: rawIdeas, mode }),
+        body: JSON.stringify({ text: rawIdeas, mode, context }),
       })
 
       const payload = (await response.json()) as {
         organizedIdeas?: Record<IdeaGroupKey, string[]>
         preservedSections?: PreservedSection[]
-        suggestedItinerary?: SuggestedItinerarySection[]
+        suggestedPlanSections?: SuggestedItinerarySection[]
         notesSummary?: string
         error?: string
       }
@@ -103,10 +122,10 @@ export function TripIdeasTab({ onAddToPlan, onAddManyToPlan }: TripIdeasTabProps
       const nextOrganizedIdeas = convertOrganizedIdeas(payload.organizedIdeas)
       const nextPreservedSections = payload.preservedSections ?? []
       const nextSuggestedItinerary =
-        (payload.suggestedItinerary ?? []).length > 0
-          ? payload.suggestedItinerary ?? []
+        (payload.suggestedPlanSections ?? []).length > 0
+          ? payload.suggestedPlanSections ?? []
           : mode === 'build_itinerary'
-            ? buildFallbackItinerary(rawIdeas, payload.preservedSections ?? [])
+            ? buildFallbackPlanSections(rawIdeas, payload.preservedSections ?? [], context.durationDays)
             : []
       const nextNotesSummary = payload.notesSummary ?? ''
       const hasAnyOutput =
@@ -154,7 +173,7 @@ export function TripIdeasTab({ onAddToPlan, onAddManyToPlan }: TripIdeasTabProps
       }
 
       if (mode === 'build_itinerary') {
-        const fallbackItinerary = buildFallbackItinerary(rawIdeas, [])
+        const fallbackItinerary = buildFallbackPlanSections(rawIdeas, [], context.durationDays)
         if (fallbackItinerary.length > 0) {
           setOrganizedIdeas(EMPTY_GROUPS)
           setPreservedSections([])
@@ -340,9 +359,9 @@ export function TripIdeasTab({ onAddToPlan, onAddManyToPlan }: TripIdeasTabProps
 
           {suggestedItinerary.length > 0 && (
             <div className="rounded-2xl border border-border/60 bg-background p-4">
-              <p className="text-sm font-semibold text-foreground">Suggested itinerary</p>
+              <p className="text-sm font-semibold text-foreground">Suggested plan</p>
               <p className="mt-1 text-xs text-muted-foreground">
-                A day-by-day draft based on the notes you pasted.
+                The AI picked the structure that best fits your notes and trip context.
               </p>
               <div className="mt-4 space-y-4">
                 {suggestedItinerary.map((section) => (
@@ -543,7 +562,7 @@ function categorizeIdea(line: string): IdeaGroupKey {
   return 'misc'
 }
 
-function buildFallbackItinerary(rawIdeas: string, preservedSections: PreservedSection[]) {
+function buildFallbackPlanSections(rawIdeas: string, preservedSections: PreservedSection[], durationDays: number) {
   if (preservedSections.length > 0) {
     return preservedSections
   }
@@ -559,7 +578,8 @@ function buildFallbackItinerary(rawIdeas: string, preservedSections: PreservedSe
   }
 
   const daySections: SuggestedItinerarySection[] = []
-  const chunkSize = Math.max(2, Math.ceil(lines.length / 3))
+  const suggestedSectionCount = durationDays > 0 ? Math.min(durationDays, Math.max(1, Math.ceil(lines.length / 3))) : 3
+  const chunkSize = Math.max(1, Math.ceil(lines.length / suggestedSectionCount))
 
   for (let index = 0; index < lines.length; index += chunkSize) {
     daySections.push({

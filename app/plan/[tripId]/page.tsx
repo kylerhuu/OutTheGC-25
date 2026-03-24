@@ -153,6 +153,35 @@ export default function PlanPage() {
     }
   }, [data])
 
+  const ideasContext = useMemo(() => {
+    if (!data || !draft) return null
+
+    const startDate = draft.finalStartDate ?? data.trip.startDate
+    const endDate = draft.finalEndDate ?? data.trip.endDate
+    const durationDays = Math.max(
+      1,
+      Math.floor((new Date(endDate).getTime() - new Date(startDate).getTime()) / (1000 * 60 * 60 * 24)) + 1,
+    )
+
+    return {
+      tripName: data.trip.name,
+      tripDescription: data.trip.description,
+      tripStartDate: data.trip.startDate,
+      tripEndDate: data.trip.endDate,
+      finalDestination: draft.finalDestination ?? '',
+      finalStartDate: draft.finalStartDate ?? null,
+      finalEndDate: draft.finalEndDate ?? null,
+      durationDays,
+      responseCount: data.trip.responses.length,
+      lodgingNotes: draft.lodgingNotes ?? '',
+      transportationNotes: draft.transportationNotes ?? '',
+      budgetNotes: draft.budgetNotes ?? '',
+      groupNotes: draft.groupNotes ?? '',
+      itineraryIdeas: draft.itineraryIdeas ?? '',
+      checklist: data.plan.todos.map((todo) => todo.text),
+    }
+  }, [data, draft])
+
   const handleDraftChange = <K extends keyof UpdateTripPlanInput>(key: K, value: UpdateTripPlanInput[K]) => {
     setDraft((current) => ({
       ...(current || {}),
@@ -491,7 +520,13 @@ export default function PlanPage() {
         </div>
 
         {activePlannerTab === 'ideas' ? (
-          <TripIdeasTab onAddToPlan={handleAddIdeaToPlan} onAddManyToPlan={handleAddManyIdeasToPlan} />
+          ideasContext ? (
+            <TripIdeasTab
+              context={ideasContext}
+              onAddToPlan={handleAddIdeaToPlan}
+              onAddManyToPlan={handleAddManyIdeasToPlan}
+            />
+          ) : null
         ) : activePlannerTab === 'final-doc' ? (
           <FinalDocTab trip={data.trip} plan={data.plan} />
         ) : (
