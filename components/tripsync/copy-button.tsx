@@ -48,7 +48,7 @@ export function CopyButton({ textToCopy, className }: CopyButtonProps) {
     <Button
       onClick={handleCopy}
       size="sm"
-      className={`w-fit gap-2 bg-primary hover:bg-primary/90 active:scale-[0.98] text-primary-foreground font-medium transition-all duration-150 ${className || ''}`}
+      className={`w-fit gap-2 bg-primary hover:bg-primary/90 hover:shadow-base active:scale-[0.98] text-primary-foreground font-medium transition-all duration-150 glow-primary ${className || ''}`}
     >
       {copied ? (
         <>

@@ -5,14 +5,20 @@ import { CreateTripModal } from "@/components/tripsync/create-trip-modal"
 import { OutTheGCLogo } from "@/components/tripsync/outthegc-logo"
 import { HeroSection } from "@/components/tripsync/hero-section"
 import { TripPreviewCard } from "@/components/tripsync/trip-preview-card"
+import { AnimatedBackground } from "@/components/tripsync/animated-background"
 
 export default function Home() {
   const [modalOpen, setModalOpen] = useState(false)
 
   return (
-    <main className="min-h-screen bg-background flex flex-col">
+    <main className="min-h-screen bg-background flex flex-col relative">
+      {/* Override the layout's subpage background with hero variant on homepage */}
+      <div className="fixed inset-0 -z-20">
+        <AnimatedBackground variant="hero" />
+      </div>
+
       {/* Nav */}
-      <header className="w-full flex items-center justify-between px-6 py-5 max-w-5xl mx-auto">
+      <header className="relative z-10 w-full flex items-center justify-between px-6 py-5 max-w-5xl mx-auto">
         <OutTheGCLogo markClassName="h-9 w-9" textClassName="h-7" />
         <button
           onClick={() => setModalOpen(true)}
@@ -26,7 +32,7 @@ export default function Home() {
       <HeroSection onCreateTrip={() => setModalOpen(true)} />
 
       {/* Preview cards */}
-      <section className="flex flex-col items-center px-6 pb-24 pt-12">
+      <section className="relative z-10 flex flex-col items-center px-6 pb-24 pt-12">
         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-6">
           Two ways this goes
         </p>
@@ -62,7 +68,7 @@ export default function Home() {
       </section>
 
       {/* Footer */}
-      <footer className="text-center text-xs text-muted-foreground py-6 border-t border-border">
+      <footer className="relative z-10 text-center text-xs text-muted-foreground py-6 border-t border-border">
         © {new Date().getFullYear()} OutTheGC. Finally get your trip out of the gc.
       </footer>
 
