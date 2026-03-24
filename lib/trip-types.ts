@@ -6,6 +6,7 @@ export interface TripRecord {
   endDate: string
   createdAt: string
   destinationOptions: string[]
+  interestOptions: string[]
 }
 
 export interface ResponseRecord {

@@ -60,6 +60,40 @@ function getDestinationOptions(destinationOptions: string[]) {
   return merged
 }
 
+function getInterestOptions(interestOptions: string[]) {
+  const defaults = [
+    'Beach',
+    'Mountains',
+    'City',
+    'Culture',
+    'Food & Dining',
+    'Adventure',
+    'Nightlife',
+    'Nature',
+    'Shopping',
+    'Relaxation',
+    'Wellness & Spa',
+    'Museums & History',
+    'Live Music',
+    'Road Trip',
+    'Scenic Views',
+    'Sports & Games',
+  ]
+
+  const seen = new Set<string>()
+  const merged: string[] = []
+
+  for (const interest of [...defaults, ...interestOptions]) {
+    const trimmed = interest.trim().replace(/\s+/g, ' ')
+    const normalized = trimmed.toLowerCase()
+    if (!trimmed || seen.has(normalized)) continue
+    seen.add(normalized)
+    merged.push(trimmed)
+  }
+
+  return merged
+}
+
 function getTripAccessKey(tripId: string) {
   return `outthegc:trip-access:${tripId}`
 }
@@ -342,6 +376,7 @@ export default function EventPage() {
               <EventInputPanel
                 tripDateRange={{ from: new Date(trip.startDate), to: new Date(trip.endDate) }}
                 destinationOptions={getDestinationOptions(trip.destinationOptions)}
+                interestOptions={getInterestOptions(trip.interestOptions)}
                 onSubmit={handleSubmit}
                 onRecoverSubmission={handleRecoverSubmission}
                 hasSubmitted={hasSubmitted}

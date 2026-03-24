@@ -24,6 +24,10 @@ function normalizeDestinationName(value: string) {
   return value.trim().replace(/\s+/g, ' ').toLowerCase()
 }
 
+function normalizeInterestName(value: string) {
+  return value.trim().replace(/\s+/g, ' ').toLowerCase()
+}
+
 function normalizeDate(value: string) {
   const normalized = new Date(value)
 
@@ -58,6 +62,20 @@ function mergeDestinationOptions(defaults: string[], shared: string[]) {
   return merged
 }
 
+function mergeInterestOptions(defaults: string[], shared: string[]) {
+  const seen = new Set<string>()
+  const merged: string[] = []
+
+  for (const item of [...defaults, ...shared]) {
+    const normalized = normalizeInterestName(item)
+    if (!normalized || seen.has(normalized)) continue
+    seen.add(normalized)
+    merged.push(item.trim().replace(/\s+/g, ' '))
+  }
+
+  return merged
+}
+
 function mapTripRecord(trip: {
   id: string
   name: string
@@ -66,6 +84,7 @@ function mapTripRecord(trip: {
   endDate: string
   createdAt: Date
   destinationOptions?: Array<{ name: string }>
+  interestOptions?: Array<{ name: string }>
 }): TripRecord {
   return {
     id: trip.id,
@@ -75,6 +94,7 @@ function mapTripRecord(trip: {
     endDate: trip.endDate,
     createdAt: trip.createdAt.toISOString(),
     destinationOptions: trip.destinationOptions?.map((option) => option.name) ?? [],
+    interestOptions: trip.interestOptions?.map((option) => option.name) ?? [],
   }
 }
 
@@ -144,6 +164,7 @@ function mapTripWithResponses(trip: {
   endDate: string
   createdAt: Date
   destinationOptions?: Array<{ name: string }>
+  interestOptions?: Array<{ name: string }>
   responses: Array<{
     id: string
     tripId: string
@@ -323,6 +344,11 @@ async function ensureTripPlan(tripId: string) {
           createdAt: 'asc',
         },
       },
+      interestOptions: {
+        orderBy: {
+          createdAt: 'asc',
+        },
+      },
       responses: {
         orderBy: {
           submittedAt: 'asc',
@@ -404,6 +430,7 @@ export async function createTrip(input: CreateTripInput): Promise<TripRecord> {
     },
     include: {
       destinationOptions: true,
+      interestOptions: true,
     },
   })
 
@@ -415,6 +442,11 @@ export async function getTripWithResponses(tripId: string): Promise<TripWithResp
     where: { id: tripId },
     include: {
       destinationOptions: {
+        orderBy: {
+          createdAt: 'asc',
+        },
+      },
+      interestOptions: {
         orderBy: {
           createdAt: 'asc',
         },
@@ -467,6 +499,39 @@ async function syncTripDestinationOptions(tripId: string, destinations: string[]
   )
 }
 
+async function syncTripInterestOptions(tripId: string, interests: string[]) {
+  const normalizedInterests = interests
+    .map((interest) => ({
+      name: interest.trim().replace(/\s+/g, ' '),
+      normalizedName: normalizeInterestName(interest),
+    }))
+    .filter((interest) => interest.normalizedName)
+
+  if (normalizedInterests.length === 0) {
+    return
+  }
+
+  await prisma.$transaction(
+    normalizedInterests.map((interest) =>
+      prisma.tripInterest.upsert({
+        where: {
+          tripId_normalizedName: {
+            tripId,
+            normalizedName: interest.normalizedName,
+          },
+        },
+        update: {},
+        create: {
+          id: generateId(10),
+          tripId,
+          name: interest.name,
+          normalizedName: interest.normalizedName,
+        },
+      }),
+    ),
+  )
+}
+
 export async function createResponse(tripId: string, input: CreateResponseInput): Promise<ResponseRecord> {
   const trip = await prisma.trip.findUnique({
     where: { id: tripId },
@@ -509,6 +574,7 @@ export async function createResponse(tripId: string, input: CreateResponseInput)
   }
 
   await syncTripDestinationOptions(tripId, destinations)
+  await syncTripInterestOptions(tripId, interests)
 
   const normalizedEditCode = input.editCode?.trim() || ''
 
@@ -587,6 +653,7 @@ export async function updateResponse(
   }
 
   await syncTripDestinationOptions(tripId, destinations)
+  await syncTripInterestOptions(tripId, interests)
 
   const response = await prisma.tripResponse.update({
     where: {
@@ -800,4 +867,27 @@ const DEFAULT_DESTINATION_OPTIONS = [
 
 export function getDestinationOptions(trip: TripRecord) {
   return mergeDestinationOptions(DEFAULT_DESTINATION_OPTIONS, trip.destinationOptions)
+}
+
+const DEFAULT_INTEREST_OPTIONS = [
+  'Beach',
+  'Mountains',
+  'City',
+  'Culture',
+  'Food & Dining',
+  'Adventure',
+  'Nightlife',
+  'Nature',
+  'Shopping',
+  'Relaxation',
+  'Wellness & Spa',
+  'Museums & History',
+  'Live Music',
+  'Road Trip',
+  'Scenic Views',
+  'Sports & Games',
+]
+
+export function getInterestOptions(trip: TripRecord) {
+  return mergeInterestOptions(DEFAULT_INTEREST_OPTIONS, trip.interestOptions)
 }

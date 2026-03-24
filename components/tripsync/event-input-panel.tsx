@@ -40,6 +40,10 @@ const INTEREST_OPTIONS = [
   { id: 'sports', label: 'Sports & Games' },
 ]
 
+const INTEREST_LABELS = Object.fromEntries(
+  INTEREST_OPTIONS.map((option) => [option.id, option.label]),
+) as Record<string, string>
+
 const BUDGET_OPTIONS = [
   { value: 'budget', label: 'Budget ($)' },
   { value: 'moderate', label: 'Moderate ($$)' },
@@ -60,6 +64,7 @@ interface UserInput {
 interface EventInputPanelProps {
   tripDateRange: { from: Date; to: Date }
   destinationOptions: string[]
+  interestOptions: string[]
   onSubmit: (input: UserInput) => Promise<void>
   onRecoverSubmission: (input: { name: string; editCode: string }) => Promise<void>
   hasSubmitted?: boolean
@@ -73,6 +78,7 @@ interface EventInputPanelProps {
 export function EventInputPanel({ 
   tripDateRange, 
   destinationOptions,
+  interestOptions,
   onSubmit, 
   onRecoverSubmission,
   hasSubmitted = false,
@@ -82,12 +88,14 @@ export function EventInputPanel({
   onGoToPlanning,
   savedEditCode,
 }: EventInputPanelProps) {
+  const resolveInterestValue = (interest: string) => INTEREST_LABELS[interest] || interest
   const [name, setName] = useState('')
   const [availability, setAvailability] = useState<DateRange | undefined>(undefined)
   const [destinations, setDestinations] = useState<string[]>([])
   const [customDestination, setCustomDestination] = useState('')
   const [budget, setBudget] = useState('')
   const [interests, setInterests] = useState<string[]>([])
+  const [customInterest, setCustomInterest] = useState('')
   const [notes, setNotes] = useState('')
   const [editCode, setEditCode] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -115,6 +123,23 @@ export function EventInputPanel({
     return merged
   }, [destinationOptions, destinations])
 
+  const normalizedInterestOptions = useMemo(() => {
+    const seen = new Set<string>()
+    const merged: string[] = []
+
+    for (const interest of [...interestOptions, ...interests]) {
+      const trimmed = resolveInterestValue(interest).trim().replace(/\s+/g, ' ')
+      const normalized = trimmed.toLowerCase()
+
+      if (!trimmed || seen.has(normalized)) continue
+
+      seen.add(normalized)
+      merged.push(trimmed)
+    }
+
+    return merged
+  }, [interestOptions, interests])
+
   // Populate form when editing
   useEffect(() => {
     if (editingParticipant) {
@@ -126,7 +151,7 @@ export function EventInputPanel({
       )
       setDestinations(editingParticipant.destinations)
       setBudget(editingParticipant.budget)
-      setInterests(editingParticipant.interests)
+      setInterests(editingParticipant.interests.map(resolveInterestValue))
       setNotes(editingParticipant.notes || '')
     } else {
       // Reset form
@@ -135,6 +160,7 @@ export function EventInputPanel({
       setDestinations([])
       setBudget('')
       setInterests([])
+      setCustomInterest('')
       setNotes('')
       setEditCode('')
     }
@@ -161,11 +187,24 @@ export function EventInputPanel({
     destinations.some((item) => item.trim().toLowerCase() === dest.trim().toLowerCase())
 
   const toggleInterest = (interestId: string) => {
+    const resolvedInterest = resolveInterestValue(interestId)
+
     setInterests(prev =>
-      prev.includes(interestId)
-        ? prev.filter(i => i !== interestId)
-        : [...prev, interestId]
+      prev.some((item) => resolveInterestValue(item).toLowerCase() === resolvedInterest.toLowerCase())
+        ? prev.filter((item) => resolveInterestValue(item).toLowerCase() !== resolvedInterest.toLowerCase())
+        : [...prev, resolvedInterest]
     )
+  }
+
+  const addInterest = (interest: string) => {
+    const trimmed = interest.trim().replace(/\s+/g, ' ')
+    const normalized = trimmed.toLowerCase()
+
+    if (trimmed && !interests.some((item) => item.trim().toLowerCase() === normalized)) {
+      setInterests([...interests, trimmed])
+    }
+
+    setCustomInterest('')
   }
 
   const handleSubmit = async () => {
@@ -498,22 +537,46 @@ export function EventInputPanel({
         <div className="flex flex-col gap-3 pt-2">
           <Label className="text-sm font-medium">Trip Vibe & Activities</Label>
           <div className="flex flex-wrap gap-2">
-            {INTEREST_OPTIONS.map(interest => (
+            {normalizedInterestOptions.map(interest => (
               <Toggle
-                key={interest.id}
+                key={interest}
                 variant="outline"
                 size="sm"
-                pressed={interests.includes(interest.id)}
-                onPressedChange={() => toggleInterest(interest.id)}
+                pressed={interests.some((item) => item.trim().toLowerCase() === interest.trim().toLowerCase())}
+                onPressedChange={() => toggleInterest(interest)}
                 className={`text-xs font-medium transition-colors ${
-                  interests.includes(interest.id)
+                  interests.some((item) => item.trim().toLowerCase() === interest.trim().toLowerCase())
                     ? 'bg-primary text-primary-foreground border-primary'
                     : 'hover:border-primary/50'
                 }`}
               >
-                {interest.label}
+                {resolveInterestValue(interest)}
               </Toggle>
             ))}
+          </div>
+          <div className="flex gap-2 mt-1">
+            <Input
+              placeholder="Add another trip vibe or activity"
+              value={customInterest}
+              onChange={(e) => setCustomInterest(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  addInterest(customInterest)
+                }
+              }}
+              className="flex-1 h-9 text-sm"
+            />
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => addInterest(customInterest)}
+              disabled={!customInterest.trim()}
+              className="gap-1"
+            >
+              <Plus className="size-4" />
+              Add
+            </Button>
           </div>
         </div>
 

@@ -16,6 +16,7 @@ model Trip {
   createdAt          DateTime          @default(now())
   responses          TripResponse[]
   destinationOptions TripDestination[]
+  interestOptions    TripInterest[]
   plan               TripPlan?
 }
 
@@ -38,6 +39,18 @@ model TripResponse {
 }
 
 model TripDestination {
+  id             String   @id
+  tripId         String
+  name           String
+  normalizedName String
+  createdAt      DateTime @default(now())
+  trip           Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade)
+
+  @@index([tripId])
+  @@unique([tripId, normalizedName])
+}
+
+model TripInterest {
   id             String   @id
   tripId         String
   name           String
