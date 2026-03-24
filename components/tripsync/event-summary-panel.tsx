@@ -1,7 +1,6 @@
 'use client'
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import { Users } from 'lucide-react'
 import { ParticipantDetails } from '@/components/tripsync/participant-details'
 import type { ParticipantData } from '@/app/event/[tripId]/page'
@@ -12,6 +11,30 @@ interface EventSummaryPanelProps {
   onSelectParticipant: (id: string | null) => void
   currentUserId: string | null
   onEditParticipant: (id: string) => void
+}
+
+// Get consistent avatar color from name
+function getAvatarColor(name: string) {
+  const colors = [
+    'bg-primary/20 text-primary',
+    'bg-accent/20 text-accent',
+    'bg-emerald-500/20 text-emerald-700',
+    'bg-amber-500/20 text-amber-700',
+    'bg-rose-500/20 text-rose-700',
+    'bg-sky-500/20 text-sky-700',
+  ]
+  let hash = 0
+  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash)
+  return colors[Math.abs(hash) % colors.length]
+}
+
+function getInitials(name: string) {
+  return name
+    .split(' ')
+    .map((p) => p[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2)
 }
 
 export function EventSummaryPanel({
@@ -43,19 +66,29 @@ export function EventSummaryPanel({
           ) : (
             <div className="flex flex-wrap gap-2">
               {participants.map((participant) => (
-                <Badge
+                <button
                   key={participant.id}
-                  variant={selectedParticipantId === participant.id ? 'default' : 'secondary'}
-                  className={`cursor-pointer text-xs font-medium transition-all ${
-                    selectedParticipantId === participant.id
-                      ? 'bg-primary text-primary-foreground ring-2 ring-primary/30'
-                      : 'hover:bg-secondary/80'
-                  } ${currentUserId === participant.id ? 'ring-1 ring-primary/50' : ''}`}
                   onClick={() => onSelectParticipant(participant.id)}
+                  className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full border transition-all duration-150 ease-out ${
+                    selectedParticipantId === participant.id
+                      ? 'bg-primary text-primary-foreground border-primary shadow-md ring-2 ring-primary/30 -translate-y-px'
+                      : 'bg-muted/50 text-foreground border-border hover:bg-muted hover:-translate-y-px hover:shadow-sm'
+                  }`}
                 >
-                  {participant.name}
-                  {currentUserId === participant.id && ' (You)'}
-                </Badge>
+                  <div
+                    className={`size-5 rounded-full flex items-center justify-center text-[9px] font-bold shrink-0 ${
+                      selectedParticipantId === participant.id
+                        ? 'bg-primary-foreground/20'
+                        : getAvatarColor(participant.name)
+                    }`}
+                  >
+                    {getInitials(participant.name)}
+                  </div>
+                  <span className="text-xs font-medium">
+                    {participant.name}
+                    {currentUserId === participant.id && ' (You)'}
+                  </span>
+                </button>
               ))}
             </div>
           )}

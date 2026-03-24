@@ -350,23 +350,19 @@ export default function PlanPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="rounded-3xl border border-primary/15 bg-gradient-to-br from-primary/10 via-sky-500/5 to-background p-5 shadow-sm">
-              <div className="flex flex-col gap-4">
-                <div className="flex flex-wrap gap-2">
-                  <Badge className="bg-background/80 text-foreground shadow-sm">1. Lock it in</Badge>
-                  <Badge className="bg-background/80 text-foreground shadow-sm">2. Add the plan</Badge>
-                  <Badge className="bg-background/80 text-foreground shadow-sm">3. Track the tasks</Badge>
-                </div>
-                <div className="flex flex-col gap-2">
-                  <p className="text-base font-semibold text-foreground">Use this page after the group already picked the trip.</p>
-                  <p className="text-sm text-muted-foreground">
-                    If you still need to compare dates or see who&apos;s free, go back to <span className="font-medium text-foreground">Results</span>.
+            {/* Hero section with quick input fields */}
+            <div className="rounded-2xl border border-border bg-card p-6">
+              <div className="flex flex-col gap-4 mb-6">
+                <div>
+                  <p className="text-base font-semibold text-foreground">Lock in the details</p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Final destination, dates, and key logistics.
                   </p>
                 </div>
               </div>
 
-              <div className="mt-4 grid gap-4 md:grid-cols-[1.2fr_1fr]">
-                <div className="space-y-2 rounded-2xl border border-white/50 bg-background/80 p-4 backdrop-blur">
+              <div className="grid gap-4 md:grid-cols-[1.2fr_1fr]">
+                <div className="space-y-2">
                   <div className="flex items-center gap-2">
                     <MapPinned className="size-4 text-primary" />
                     <label className="text-sm font-semibold text-foreground">Final destination</label>
@@ -375,9 +371,10 @@ export default function PlanPage() {
                     value={draft.finalDestination || ''}
                     placeholder={suggestions?.topDestination || 'Choose the final destination'}
                     onChange={(event) => handleDraftChange('finalDestination', event.target.value)}
+                    className="border-border/60"
                   />
                 </div>
-                <div className="space-y-2 rounded-2xl border border-white/50 bg-background/80 p-4 backdrop-blur">
+                <div className="space-y-2">
                   <div className="flex items-center gap-2">
                     <CalendarDays className="size-4 text-primary" />
                     <label className="text-sm font-semibold text-foreground">Final dates</label>
@@ -387,28 +384,31 @@ export default function PlanPage() {
                       type="date"
                       value={toDateInputValue(draft.finalStartDate || null)}
                       onChange={(event) => handleDraftChange('finalStartDate', fromDateInputValue(event.target.value))}
+                      className="border-border/60"
                     />
                     <Input
                       type="date"
                       value={toDateInputValue(draft.finalEndDate || null)}
                       onChange={(event) => handleDraftChange('finalEndDate', fromDateInputValue(event.target.value))}
+                      className="border-border/60"
                     />
                   </div>
                   {suggestions?.bestDates && (
-                    <p className="text-xs text-muted-foreground">Suggested from responses: {suggestions.bestDates}</p>
+                    <p className="text-xs text-muted-foreground">Suggested: {suggestions.bestDates}</p>
                   )}
                 </div>
               </div>
             </div>
 
-            <div className="grid gap-4 lg:grid-cols-2">
-              <div className="rounded-3xl border border-amber-200/60 bg-gradient-to-br from-amber-50 to-background p-4">
-                <div className="mb-4">
-                  <div className="flex items-center gap-2">
-                    <PlaneTakeoff className="size-4 text-amber-600" />
-                    <p className="text-sm font-semibold text-foreground">Travel details</p>
+            {/* Planning sections — cleaner 2-col layout */}
+            <div className="grid gap-5 lg:grid-cols-2">
+              <div className="rounded-2xl border border-border bg-card p-6">
+                <div className="mb-5 flex items-center gap-2">
+                  <PlaneTakeoff className="size-5 text-primary shrink-0" />
+                  <div>
+                    <p className="font-semibold text-foreground text-sm">Travel & Lodging</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Where to stay and how to get there.</p>
                   </div>
-                  <p className="mt-1 text-xs text-muted-foreground">Where to stay and how to get there.</p>
                 </div>
                 <div className="space-y-4">
                   <div className="space-y-2">
@@ -417,7 +417,7 @@ export default function PlanPage() {
                       value={draft.lodgingNotes || ''}
                       onChange={(event) => handleDraftChange('lodgingNotes', event.target.value)}
                       placeholder={SECTION_PLACEHOLDERS.lodgingNotes}
-                      className="min-h-[150px] resize-none"
+                      className="min-h-[140px] resize-none border-border/60"
                     />
                   </div>
                   <div className="space-y-2">
@@ -426,19 +426,19 @@ export default function PlanPage() {
                       value={draft.transportationNotes || ''}
                       onChange={(event) => handleDraftChange('transportationNotes', event.target.value)}
                       placeholder={SECTION_PLACEHOLDERS.transportationNotes}
-                      className="min-h-[150px] resize-none"
+                      className="min-h-[140px] resize-none border-border/60"
                     />
                   </div>
                 </div>
               </div>
 
-              <div className="rounded-3xl border border-sky-200/60 bg-gradient-to-br from-sky-50 to-background p-4">
-                <div className="mb-4">
-                  <div className="flex items-center gap-2">
-                    <NotebookPen className="size-4 text-sky-600" />
-                    <p className="text-sm font-semibold text-foreground">Ideas + notes</p>
+              <div className="rounded-2xl border border-border bg-card p-6">
+                <div className="mb-5 flex items-center gap-2">
+                  <NotebookPen className="size-5 text-primary shrink-0" />
+                  <div>
+                    <p className="font-semibold text-foreground text-sm">Itinerary & Notes</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">The rough plan, all in one spot.</p>
                   </div>
-                  <p className="mt-1 text-xs text-muted-foreground">The rough plan, all in one spot.</p>
                 </div>
                 <div className="space-y-4">
                   <div className="space-y-2">
@@ -447,28 +447,32 @@ export default function PlanPage() {
                       value={draft.itineraryIdeas || ''}
                       onChange={(event) => handleDraftChange('itineraryIdeas', event.target.value)}
                       placeholder={SECTION_PLACEHOLDERS.itineraryIdeas}
-                      className="min-h-[150px] resize-none"
+                      className="min-h-[140px] resize-none border-border/60"
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-sm font-medium text-foreground">Notes</label>
+                    <label className="text-sm font-medium text-foreground">Group notes</label>
                     <Textarea
                       value={draft.groupNotes || ''}
                       onChange={(event) => handleDraftChange('groupNotes', event.target.value)}
                       placeholder={SECTION_PLACEHOLDERS.groupNotes}
-                      className="min-h-[150px] resize-none"
+                      className="min-h-[140px] resize-none border-border/60"
                     />
                   </div>
                 </div>
               </div>
             </div>
 
-            <div className="rounded-3xl border border-primary/15 bg-gradient-to-br from-primary/8 via-background to-fuchsia-500/5 p-4">
-              <div className="mb-4 flex items-center gap-2">
-                <CheckSquare className="size-4 text-primary" />
-                <p className="text-sm font-semibold text-foreground">Checklist</p>
+            {/* Checklist */}
+            <div className="rounded-2xl border border-border bg-card p-6">
+              <div className="mb-5 flex items-center gap-2">
+                <CheckSquare className="size-5 text-primary shrink-0" />
+                <div>
+                  <p className="font-semibold text-foreground text-sm">Checklist</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Track flights, bookings, and prep tasks.</p>
+                </div>
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-2 mb-4">
                 <Input
                   value={newTodo}
                   onChange={(event) => setNewTodo(event.target.value)}
@@ -479,24 +483,25 @@ export default function PlanPage() {
                       void handleAddTodo()
                     }
                   }}
+                  className="border-border/60"
                 />
-                <Button onClick={() => void handleAddTodo()} disabled={isAddingTodo}>
+                <Button onClick={() => void handleAddTodo()} disabled={isAddingTodo} size="sm">
                   {isAddingTodo ? <Loader2 className="size-4 animate-spin" /> : 'Add'}
                 </Button>
               </div>
-              {todoError && <p className="mt-3 text-sm text-destructive">{todoError}</p>}
-              <div className="mt-4 space-y-2">
+              {todoError && <p className="mb-3 text-sm text-destructive">{todoError}</p>}
+              <div className="space-y-2">
                 {data.plan.todos.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">Keep it simple: flights, lodging, key bookings, and anything easy to forget.</p>
+                  <p className="text-sm text-muted-foreground">Keep it simple: flights, lodging, key bookings, and easy-to-forget details.</p>
                 ) : (
                   data.plan.todos.map((todo) => (
-                    <div key={todo.id} className="flex items-start gap-3 rounded-xl border border-border/60 bg-background px-3 py-3">
+                    <div key={todo.id} className="flex items-center gap-3 rounded-lg border border-border/60 bg-muted/40 px-3 py-3 hover:bg-muted/60 transition-colors duration-150">
                       <Checkbox
                         checked={todo.completed}
                         onCheckedChange={() => void handleToggleTodo(todo)}
                         disabled={busyTodoId === todo.id}
                       />
-                      <p className={`min-w-0 flex-1 text-sm ${todo.completed ? 'text-muted-foreground line-through' : 'text-foreground'}`}>
+                      <p className={`flex-1 text-sm ${todo.completed ? 'text-muted-foreground line-through' : 'text-foreground'}`}>
                         {todo.text}
                       </p>
                       <Button
@@ -505,6 +510,7 @@ export default function PlanPage() {
                         size="sm"
                         onClick={() => void handleDeleteTodo(todo.id)}
                         disabled={busyTodoId === todo.id}
+                        className="text-xs"
                       >
                         Remove
                       </Button>
@@ -514,17 +520,18 @@ export default function PlanPage() {
               </div>
             </div>
 
-            <div className="flex flex-col gap-3 border-t border-border/50 pt-4 sm:flex-row sm:items-center sm:justify-between">
+            {/* Save footer */}
+            <div className="flex flex-col gap-3 border-t border-border/50 pt-5 sm:flex-row sm:items-center sm:justify-between">
               <div className="text-sm">
                 {saveError ? (
                   <p className="text-destructive">{saveError}</p>
                 ) : saveMessage ? (
-                  <p className="text-primary">{saveMessage}</p>
+                  <p className="text-primary font-medium">{saveMessage}</p>
                 ) : (
-                  <p className="text-muted-foreground">Keep this page for the actual plan, not decision-making.</p>
+                  <p className="text-muted-foreground">Auto-saves as you type.</p>
                 )}
               </div>
-              <Button onClick={handleSavePlan} disabled={isSaving}>
+              <Button onClick={handleSavePlan} disabled={isSaving} size="sm">
                 {isSaving ? (
                   <>
                     <Spinner className="mr-2 size-4" />

@@ -48,17 +48,17 @@ export function CopyButton({ textToCopy, className }: CopyButtonProps) {
     <Button
       onClick={handleCopy}
       size="sm"
-      className={`w-fit gap-2 bg-primary hover:bg-primary/90 text-primary-foreground font-medium ${className || ''}`}
+      className={`w-fit gap-2 bg-primary hover:bg-primary/90 active:scale-[0.98] text-primary-foreground font-medium transition-all duration-150 ${className || ''}`}
     >
       {copied ? (
         <>
-          <Check className="size-4" />
+          <Check className="size-4 animate-in fade-in duration-200" />
           Copied!
         </>
       ) : (
         <>
           <Copy className="size-4" />
-          Copy Link
+          Copy link
         </>
       )}
     </Button>

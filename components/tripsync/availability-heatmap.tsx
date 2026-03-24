@@ -226,12 +226,12 @@ export function AvailabilityHeatmap({ participants, tripDateRange, tripDurationD
               )}
               <div className="space-y-2">
                 {bestWindows.map((window, index) => (
-                  <div
+                  <button
                     key={`${window.start.toISOString()}-${window.end.toISOString()}`}
-                    className={`flex cursor-pointer items-start justify-between gap-3 rounded-lg border px-3 py-2 transition-colors ${
+                    className={`w-full flex cursor-pointer items-start justify-between gap-3 rounded-lg border px-3 py-2.5 transition-all duration-150 ease-out ${
                       activeWindowKey === getWindowKey(window)
-                        ? 'border-primary/40 bg-primary/10'
-                        : 'border-transparent bg-background hover:border-border/70 hover:bg-muted/40'
+                        ? 'border-primary/60 bg-primary/12 ring-2 ring-primary/20 -translate-y-px shadow-sm'
+                        : 'border-transparent bg-muted/30 hover:bg-muted/60 hover:-translate-y-px hover:shadow-sm'
                     }`}
                     onMouseEnter={() => setActiveWindowKey(getWindowKey(window))}
                     onMouseLeave={() => setActiveWindowKey(null)}
@@ -242,17 +242,16 @@ export function AvailabilityHeatmap({ participants, tripDateRange, tripDurationD
                       )
                     }}
                   >
-                    <div>
-                      <p className="text-sm font-medium text-foreground">
-                        {window.start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {window.end.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    <div className="text-left">
+                      <p className="text-sm font-semibold text-foreground leading-tight">
+                        {window.start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – {window.end.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                       </p>
-                      <p className="text-xs text-muted-foreground">{window.minAvailable}/{participants.length} available</p>
+                      <p className="text-xs text-muted-foreground mt-1">{window.minAvailable}/{participants.length} available · {suggestedDuration}-day trip</p>
                     </div>
-                    <div className="text-right">
-                      <p className="text-xs font-semibold text-primary">#{index + 1}</p>
-                      <p className="text-xs text-muted-foreground">{suggestedDuration} day{suggestedDuration === 1 ? '' : 's'}</p>
+                    <div className="text-right shrink-0">
+                      <p className="text-xs font-bold text-primary">#{index + 1}</p>
                     </div>
-                  </div>
+                  </button>
                 ))}
               </div>
             </div>
@@ -269,10 +268,11 @@ export function AvailabilityHeatmap({ participants, tripDateRange, tripDurationD
               <Button
                 type="button"
                 size="sm"
-                variant={showCalendar ? 'outline' : 'default'}
+                variant={showCalendar ? 'default' : 'outline'}
                 onClick={() => setShowCalendar((current) => !current)}
+                className="transition-all duration-150"
               >
-                {showCalendar ? 'Hide monthly availability' : 'Show monthly availability'}
+                {showCalendar ? 'Hide calendar' : 'Show calendar'}
               </Button>
             </div>
           </div>
@@ -313,8 +313,8 @@ export function AvailabilityHeatmap({ participants, tripDateRange, tripDurationD
                             return (
                               <div
                                 key={`${section.key}-${day.date.toISOString()}`}
-                                className={`relative flex aspect-square min-h-9 items-center justify-center rounded-md border text-[11px] font-medium transition-all ${
-                                  isHighlighted ? 'border-primary ring-2 ring-primary/20' : 'border-transparent'
+                                className={`relative flex aspect-square min-h-9 items-center justify-center rounded-md border text-[11px] font-medium transition-all duration-150 ease-out cursor-default ${
+                                  isHighlighted ? 'border-primary/60 ring-2 ring-primary/25 -translate-y-px shadow-sm' : 'border-transparent'
                                 } ${getIntensityClass(day.percentage, hasUniformAvailability)} ${
                                   day.percentage >= 75 && !hasUniformAvailability ? 'text-primary-foreground' : 'text-foreground/80'
                                 }`}
