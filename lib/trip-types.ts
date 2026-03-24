@@ -57,11 +57,15 @@ export interface TripPlanRecord {
   finalDestination: string
   finalStartDate: string | null
   finalEndDate: string | null
-  itineraryIdeas: string
-  lodgingNotes: string
+  housingNotes: string
+  attractionNotes: string
+  foodNotes: string
+  activityNotes: string
+  dayPlanNotes: string
   transportationNotes: string
-  budgetNotes: string
-  groupNotes: string
+  bookingNotes: string
+  otherNotes: string
+  finalDocContent: string
   createdAt: string
   updatedAt: string
   todos: TripPlanTodoRecord[]
@@ -120,11 +124,15 @@ export interface UpdateTripPlanInput {
   finalDestination?: string
   finalStartDate?: string | null
   finalEndDate?: string | null
-  itineraryIdeas?: string
-  lodgingNotes?: string
+  housingNotes?: string
+  attractionNotes?: string
+  foodNotes?: string
+  activityNotes?: string
+  dayPlanNotes?: string
   transportationNotes?: string
-  budgetNotes?: string
-  groupNotes?: string
+  bookingNotes?: string
+  otherNotes?: string
+  finalDocContent?: string
 }
 
 export interface CreateTripPlanTodoInput {

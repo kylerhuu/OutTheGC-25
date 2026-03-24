@@ -205,9 +205,17 @@ function mapTripPlanRecord(plan: {
   finalDestination: string
   finalStartDate: string | null
   finalEndDate: string | null
+  housingNotes: string
+  attractionNotes: string
+  foodNotes: string
+  activityNotes: string
+  dayPlanNotes: string
+  transportationNotes: string
+  bookingNotes: string
+  otherNotes: string
+  finalDocContent: string
   itineraryIdeas: string
   lodgingNotes: string
-  transportationNotes: string
   budgetNotes: string
   groupNotes: string
   createdAt: Date
@@ -227,11 +235,15 @@ function mapTripPlanRecord(plan: {
     finalDestination: plan.finalDestination,
     finalStartDate: plan.finalStartDate,
     finalEndDate: plan.finalEndDate,
-    itineraryIdeas: plan.itineraryIdeas,
-    lodgingNotes: plan.lodgingNotes,
+    housingNotes: plan.housingNotes || plan.lodgingNotes,
+    attractionNotes: plan.attractionNotes,
+    foodNotes: plan.foodNotes,
+    activityNotes: plan.activityNotes,
+    dayPlanNotes: plan.dayPlanNotes || plan.itineraryIdeas,
     transportationNotes: plan.transportationNotes,
-    budgetNotes: plan.budgetNotes,
-    groupNotes: plan.groupNotes,
+    bookingNotes: plan.bookingNotes || plan.budgetNotes,
+    otherNotes: plan.otherNotes || plan.groupNotes,
+    finalDocContent: plan.finalDocContent,
     createdAt: plan.createdAt.toISOString(),
     updatedAt: plan.updatedAt.toISOString(),
     todos: plan.todos?.map(mapTripPlanTodoRecord) ?? [],
@@ -376,9 +388,17 @@ async function ensureTripPlan(tripId: string) {
       finalDestination: '',
       finalStartDate: null,
       finalEndDate: null,
+      housingNotes: '',
+      attractionNotes: '',
+      foodNotes: '',
+      activityNotes: '',
+      dayPlanNotes: '',
+      transportationNotes: '',
+      bookingNotes: '',
+      otherNotes: '',
+      finalDocContent: '',
       itineraryIdeas: '',
       lodgingNotes: '',
-      transportationNotes: '',
       budgetNotes: '',
       groupNotes: '',
     },
@@ -737,11 +757,19 @@ export async function updateTripPlan(tripId: string, input: UpdateTripPlanInput)
       finalDestination: finalDestination ?? trip.plan.finalDestination,
       finalStartDate: finalStartDate ?? null,
       finalEndDate: finalEndDate ?? null,
-      itineraryIdeas: input.itineraryIdeas?.trim() ?? trip.plan.itineraryIdeas,
-      lodgingNotes: input.lodgingNotes?.trim() ?? trip.plan.lodgingNotes,
+      housingNotes: input.housingNotes?.trim() ?? trip.plan.housingNotes,
+      attractionNotes: input.attractionNotes?.trim() ?? trip.plan.attractionNotes,
+      foodNotes: input.foodNotes?.trim() ?? trip.plan.foodNotes,
+      activityNotes: input.activityNotes?.trim() ?? trip.plan.activityNotes,
+      dayPlanNotes: input.dayPlanNotes?.trim() ?? trip.plan.dayPlanNotes,
       transportationNotes: input.transportationNotes?.trim() ?? trip.plan.transportationNotes,
-      budgetNotes: input.budgetNotes?.trim() ?? trip.plan.budgetNotes,
-      groupNotes: input.groupNotes?.trim() ?? trip.plan.groupNotes,
+      bookingNotes: input.bookingNotes?.trim() ?? trip.plan.bookingNotes,
+      otherNotes: input.otherNotes?.trim() ?? trip.plan.otherNotes,
+      finalDocContent: input.finalDocContent?.trim() ?? trip.plan.finalDocContent,
+      itineraryIdeas: input.dayPlanNotes?.trim() ?? trip.plan.itineraryIdeas,
+      lodgingNotes: input.housingNotes?.trim() ?? trip.plan.lodgingNotes,
+      budgetNotes: input.bookingNotes?.trim() ?? trip.plan.budgetNotes,
+      groupNotes: input.otherNotes?.trim() ?? trip.plan.groupNotes,
     },
     include: {
       todos: {

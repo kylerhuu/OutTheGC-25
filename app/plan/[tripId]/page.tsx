@@ -2,18 +2,17 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useParams } from 'next/navigation'
-import { CalendarDays, CheckSquare, Loader2, MapPinned, NotebookPen, PlaneTakeoff } from 'lucide-react'
+import { CalendarDays, Loader2, MapPinned, Sparkles } from 'lucide-react'
 import { EventTopBar } from '@/components/tripsync/event-top-bar'
 import { FinalDocTab } from '@/components/tripsync/final-doc-tab'
-import { TripIdeasTab, type IdeaGroupKey } from '@/components/tripsync/trip-ideas-tab'
 import { TripSnapshot } from '@/components/tripsync/trip-snapshot'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
 import { Textarea } from '@/components/ui/textarea'
+import { buildFinalDocContent } from '@/lib/final-doc'
+import { parseStoredDate } from '@/lib/date-utils'
 import type {
   TripPlanPageData,
   TripPlanRecord,
@@ -28,33 +27,38 @@ interface PlanPayload extends Partial<TripPlanPageData> {
 interface PlanSavePayload {
   plan?: TripPlanRecord
   error?: string
-}
-
-interface TodoPayload {
-  todo?: TripPlanTodoRecord
-  error?: string
+  usedFallback?: boolean
 }
 
 const SECTION_PLACEHOLDERS = {
-  itineraryIdeas:
-    'Arrival day\n- \n\nMain plans\n- \n\nAnything flexible\n- ',
-  lodgingNotes:
-    'Where to stay\n- \n\nPrice range\n- \n\nMust-haves\n- ',
-  transportationNotes:
-    'Flights / driving\n- \n\nArrival timing\n- \n\nGetting around\n- ',
-  groupNotes:
-    'Anything else the group should remember\n- \n\nOpen questions\n- ',
+  housingNotes: 'Hotels, Airbnbs, neighborhoods, room setup, price ideas...',
+  attractionNotes: 'Places to visit, museums, parks, landmarks, scenic spots...',
+  foodNotes: 'Restaurants, cafes, dessert spots, local dishes to try...',
+  activityNotes: 'Fun things to do, nightlife, shopping, hiking, beach time...',
+  dayPlanNotes: 'Day 1 ideas, possible order of activities, rough schedule...',
+  transportationNotes: 'Flights, trains, driving, transfers, local transport...',
+  bookingNotes: 'Things that still need reservations, tickets, or booking reminders...',
+  otherNotes: 'Anything else the group wants to remember or think through...',
 }
+
+const DOC_SECTIONS: Array<{
+  key: keyof UpdateTripPlanInput
+  title: string
+  description: string
+}> = [
+  { key: 'housingNotes', title: 'Housing', description: 'Where you might stay and what kind of place fits the trip.' },
+  { key: 'attractionNotes', title: 'Attractions', description: 'Main places worth visiting.' },
+  { key: 'foodNotes', title: 'Food Spots', description: 'Restaurants, cafes, desserts, and food ideas.' },
+  { key: 'activityNotes', title: 'Fun Things To Do', description: 'Anything fun, social, relaxing, or memorable.' },
+  { key: 'dayPlanNotes', title: 'Possible Day Plan', description: 'A rough day-by-day flow if you want one.' },
+  { key: 'transportationNotes', title: 'Transportation', description: 'How you are getting there and moving around.' },
+  { key: 'bookingNotes', title: 'Things To Book', description: 'Tickets, lodging, tours, and anything time-sensitive.' },
+  { key: 'otherNotes', title: 'Other Notes', description: 'Loose thoughts, reminders, and open questions.' },
+]
 
 function formatDateRange(from: Date, to: Date) {
   const options: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric', year: 'numeric' }
   return `${from.toLocaleDateString('en-US', options)} - ${to.toLocaleDateString('en-US', options)}`
-}
-
-function formatShortDateRange(startDate: string, endDate: string) {
-  const start = new Date(startDate)
-  const end = new Date(endDate)
-  return `${start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${end.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
 }
 
 function toDateInputValue(value: string | null) {
@@ -71,17 +75,13 @@ export default function PlanPage() {
   const tripId = params.tripId as string
   const [data, setData] = useState<TripPlanPageData | null>(null)
   const [draft, setDraft] = useState<UpdateTripPlanInput | null>(null)
-  const [newTodo, setNewTodo] = useState('')
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   const [saveMessage, setSaveMessage] = useState<string | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
-  const [todoError, setTodoError] = useState<string | null>(null)
-  const [isAddingTodo, setIsAddingTodo] = useState(false)
-  const [busyTodoId, setBusyTodoId] = useState<string | null>(null)
-  const [activePlannerTab, setActivePlannerTab] = useState<'ideas' | 'plan' | 'final-doc'>('plan')
-  const [highlightedPlanField, setHighlightedPlanField] = useState<keyof UpdateTripPlanInput | null>(null)
+  const [activePlannerTab, setActivePlannerTab] = useState<'plan' | 'final-doc'>('plan')
+  const [isOrganizing, setIsOrganizing] = useState(false)
 
   const loadPlan = useCallback(async () => {
     setIsLoading(true)
@@ -104,11 +104,16 @@ export default function PlanPage() {
         finalDestination: payload.plan.finalDestination,
         finalStartDate: payload.plan.finalStartDate,
         finalEndDate: payload.plan.finalEndDate,
-        itineraryIdeas: payload.plan.itineraryIdeas,
-        lodgingNotes: payload.plan.lodgingNotes,
+        housingNotes: payload.plan.housingNotes,
+        attractionNotes: payload.plan.attractionNotes,
+        foodNotes: payload.plan.foodNotes,
+        activityNotes: payload.plan.activityNotes,
+        dayPlanNotes: payload.plan.dayPlanNotes,
         transportationNotes: payload.plan.transportationNotes,
-        budgetNotes: payload.plan.budgetNotes,
-        groupNotes: payload.plan.groupNotes,
+        bookingNotes: payload.plan.bookingNotes,
+        otherNotes: payload.plan.otherNotes,
+        finalDocContent:
+          payload.plan.finalDocContent || buildFinalDocContent(payload.trip, payload.plan),
       })
     } catch (error) {
       setLoadError(error instanceof Error ? error.message : 'Unable to load planning board.')
@@ -120,16 +125,6 @@ export default function PlanPage() {
   useEffect(() => {
     void loadPlan()
   }, [loadPlan])
-
-  useEffect(() => {
-    if (!highlightedPlanField) return
-
-    const timeout = window.setTimeout(() => {
-      setHighlightedPlanField(null)
-    }, 2500)
-
-    return () => window.clearTimeout(timeout)
-  }, [highlightedPlanField])
 
   const shareUrl = useMemo(() => {
     if (typeof window === 'undefined') {
@@ -145,42 +140,16 @@ export default function PlanPage() {
     return {
       topDestination: data.suggestions.topDestinations[0]?.label || '',
       bestDates: data.suggestions.bestDateWindows[0]
-        ? formatShortDateRange(
-            data.suggestions.bestDateWindows[0].startDate,
-            data.suggestions.bestDateWindows[0].endDate,
-          )
+        ? `${parseStoredDate(data.suggestions.bestDateWindows[0].startDate).toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+          })} - ${parseStoredDate(data.suggestions.bestDateWindows[0].endDate).toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+          })}`
         : '',
     }
   }, [data])
-
-  const ideasContext = useMemo(() => {
-    if (!data || !draft) return null
-
-    const startDate = draft.finalStartDate ?? data.trip.startDate
-    const endDate = draft.finalEndDate ?? data.trip.endDate
-    const durationDays = Math.max(
-      1,
-      Math.floor((new Date(endDate).getTime() - new Date(startDate).getTime()) / (1000 * 60 * 60 * 24)) + 1,
-    )
-
-    return {
-      tripName: data.trip.name,
-      tripDescription: data.trip.description,
-      tripStartDate: data.trip.startDate,
-      tripEndDate: data.trip.endDate,
-      finalDestination: draft.finalDestination ?? '',
-      finalStartDate: draft.finalStartDate ?? null,
-      finalEndDate: draft.finalEndDate ?? null,
-      durationDays,
-      responseCount: data.trip.responses.length,
-      lodgingNotes: draft.lodgingNotes ?? '',
-      transportationNotes: draft.transportationNotes ?? '',
-      budgetNotes: draft.budgetNotes ?? '',
-      groupNotes: draft.groupNotes ?? '',
-      itineraryIdeas: draft.itineraryIdeas ?? '',
-      checklist: data.plan.todos.map((todo) => todo.text),
-    }
-  }, [data, draft])
 
   const handleDraftChange = <K extends keyof UpdateTripPlanInput>(key: K, value: UpdateTripPlanInput[K]) => {
     setDraft((current) => ({
@@ -191,343 +160,95 @@ export default function PlanPage() {
     setSaveError(null)
   }
 
-  const savePlan = useCallback(async (nextDraft: UpdateTripPlanInput) => {
-    setIsSaving(true)
-    setSaveError(null)
-    setSaveMessage(null)
+  const savePlan = useCallback(
+    async (nextDraft: UpdateTripPlanInput) => {
+      setIsSaving(true)
+      setSaveError(null)
+      setSaveMessage(null)
 
-    try {
-      const response = await fetch(`/api/trips/${tripId}/plan`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(nextDraft),
-      })
+      try {
+        const response = await fetch(`/api/trips/${tripId}/plan`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(nextDraft),
+        })
 
-      const payload = (await response.json()) as PlanSavePayload
+        const payload = (await response.json()) as PlanSavePayload
 
-      if (!response.ok || !payload.plan) {
-        throw new Error(payload.error || 'Unable to save plan.')
+        if (!response.ok || !payload.plan) {
+          throw new Error(payload.error || 'Unable to save plan.')
+        }
+
+        setData((current) => (current ? { ...current, plan: payload.plan! } : current))
+        setDraft({
+          finalDestination: payload.plan.finalDestination,
+          finalStartDate: payload.plan.finalStartDate,
+          finalEndDate: payload.plan.finalEndDate,
+          housingNotes: payload.plan.housingNotes,
+          attractionNotes: payload.plan.attractionNotes,
+          foodNotes: payload.plan.foodNotes,
+          activityNotes: payload.plan.activityNotes,
+          dayPlanNotes: payload.plan.dayPlanNotes,
+          transportationNotes: payload.plan.transportationNotes,
+          bookingNotes: payload.plan.bookingNotes,
+          otherNotes: payload.plan.otherNotes,
+          finalDocContent:
+            payload.plan.finalDocContent ||
+            (data ? buildFinalDocContent(data.trip, payload.plan) : ''),
+        })
+        setSaveMessage('Plan saved.')
+        return payload.plan
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unable to save plan.'
+        setSaveError(message)
+        throw new Error(message)
+      } finally {
+        setIsSaving(false)
       }
-
-      setData((current) => (current ? { ...current, plan: payload.plan! } : current))
-      setDraft({
-        finalDestination: payload.plan.finalDestination,
-        finalStartDate: payload.plan.finalStartDate,
-        finalEndDate: payload.plan.finalEndDate,
-        itineraryIdeas: payload.plan.itineraryIdeas,
-        lodgingNotes: payload.plan.lodgingNotes,
-        transportationNotes: payload.plan.transportationNotes,
-        budgetNotes: payload.plan.budgetNotes,
-        groupNotes: payload.plan.groupNotes,
-      })
-      setSaveMessage('Plan saved.')
-      return payload.plan
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unable to save plan.'
-      setSaveError(message)
-      throw new Error(message)
-    } finally {
-      setIsSaving(false)
-    }
-  }, [tripId])
+    },
+    [data, tripId],
+  )
 
   const handleSavePlan = async () => {
     if (!draft) return
     await savePlan(draft)
   }
 
-  const handleAddIdeaToPlan = useCallback(
-    async (group: IdeaGroupKey, text: string) => {
-      if (!draft) {
-        throw new Error('Plan is not ready yet.')
-      }
-
-      const trimmedText = text.trim()
-      if (!trimmedText) {
-        return { added: false }
-      }
-
-      const field: keyof UpdateTripPlanInput =
-        group === 'stays'
-          ? 'lodgingNotes'
-          : group === 'transport'
-            ? 'transportationNotes'
-            : group === 'misc'
-              ? 'groupNotes'
-              : 'itineraryIdeas'
-
-      const currentValue = (draft[field] ?? '').trim()
-      const existingLines = currentValue
-        .split('\n')
-        .map((line) => line.replace(/^[-*]\s*/, '').trim().toLowerCase())
-        .filter(Boolean)
-
-      if (existingLines.includes(trimmedText.toLowerCase())) {
-        return { added: false }
-      }
-
-      const bullet = `- ${trimmedText}`
-      const nextValue = currentValue ? `${currentValue}\n${bullet}` : bullet
-      const nextDraft = {
-        ...draft,
-        [field]: nextValue,
-      }
-
-      setDraft(nextDraft)
-      await savePlan(nextDraft)
-      setHighlightedPlanField(field)
-      return { added: true }
-    },
-    [draft, savePlan],
-  )
-
-  const handleAddManyIdeasToPlan = useCallback(
-    async (items: Array<{ group: IdeaGroupKey; text: string }>) => {
-      if (!draft) {
-        throw new Error('Plan is not ready yet.')
-      }
-
-      const nextDraft: UpdateTripPlanInput = { ...draft }
-      let addedCount = 0
-      let duplicateCount = 0
-      const touchedFields = new Set<keyof UpdateTripPlanInput>()
-
-      for (const item of items) {
-        const trimmedText = item.text.trim()
-        if (!trimmedText) continue
-
-        const field: keyof UpdateTripPlanInput =
-          item.group === 'stays'
-            ? 'lodgingNotes'
-            : item.group === 'transport'
-              ? 'transportationNotes'
-              : item.group === 'misc'
-                ? 'groupNotes'
-                : 'itineraryIdeas'
-
-        const currentValue = (nextDraft[field] ?? '').trim()
-        const existingLines = currentValue
-          .split('\n')
-          .map((line) => line.replace(/^[-*]\s*/, '').trim().toLowerCase())
-          .filter(Boolean)
-
-        if (existingLines.includes(trimmedText.toLowerCase())) {
-          duplicateCount += 1
-          continue
-        }
-
-        const bullet = `- ${trimmedText}`
-        nextDraft[field] = currentValue ? `${currentValue}\n${bullet}` : bullet
-        touchedFields.add(field)
-        addedCount += 1
-      }
-
-      if (addedCount === 0) {
-        return { addedCount, duplicateCount }
-      }
-
-      setDraft(nextDraft)
-      await savePlan(nextDraft)
-
-      const highlightPriority: Array<keyof UpdateTripPlanInput> = [
-        'lodgingNotes',
-        'transportationNotes',
-        'itineraryIdeas',
-        'groupNotes',
-      ]
-      const firstTouched = highlightPriority.find((field) => touchedFields.has(field)) ?? null
-      setHighlightedPlanField(firstTouched)
-
-      return { addedCount, duplicateCount }
-    },
-    [draft, savePlan],
-  )
-
-  const handleApplyDraftToPlan = useCallback(
-    async (payload: {
-      sections: Array<{ title: string; items: string[] }>
-      mode: 'replace' | 'append'
-    }) => {
-      if (!draft) {
-        throw new Error('Plan is not ready yet.')
-      }
-
-      const nextDraft: UpdateTripPlanInput = { ...draft }
-      const itinerarySections: string[] = []
-      const lodgingLines: string[] = []
-      const transportLines: string[] = []
-      const noteLines: string[] = []
-
-      for (const section of payload.sections) {
-        const title = section.title.trim()
-        const sectionLines = section.items
-          .map((item) => item.trim())
-          .filter(Boolean)
-
-        if (sectionLines.length === 0) continue
-
-        if (/(stay|stays|lodging|hotel|airbnb)/i.test(title)) {
-          lodgingLines.push(...sectionLines)
-          continue
-        }
-
-        if (/(transport|transportation|flight|train|bus|get there|travel)/i.test(title)) {
-          transportLines.push(...sectionLines)
-          continue
-        }
-
-        if (/(note|notes|overview)/i.test(title)) {
-          noteLines.push(...sectionLines)
-          continue
-        }
-
-        itinerarySections.push(title)
-        itinerarySections.push(...sectionLines.map((line) => `- ${line}`))
-        itinerarySections.push('')
-      }
-
-      const appendBlock = (currentValue: string | undefined, nextLines: string[]) => {
-        const cleanedNext = nextLines.map((line) => line.trim()).filter(Boolean)
-        if (cleanedNext.length === 0) return currentValue ?? ''
-
-        const nextBlock = cleanedNext.join('\n').trim()
-        const current = (currentValue ?? '').trim()
-
-        if (payload.mode === 'replace' || !current) {
-          return nextBlock
-        }
-
-        return `${current}\n\n${nextBlock}`.trim()
-      }
-
-      nextDraft.itineraryIdeas = appendBlock(nextDraft.itineraryIdeas, itinerarySections)
-      nextDraft.lodgingNotes = appendBlock(nextDraft.lodgingNotes, lodgingLines.map((line) => `- ${line}`))
-      nextDraft.transportationNotes = appendBlock(
-        nextDraft.transportationNotes,
-        transportLines.map((line) => `- ${line}`),
-      )
-      nextDraft.groupNotes = appendBlock(nextDraft.groupNotes, noteLines.map((line) => `- ${line}`))
-
-      setDraft(nextDraft)
-      await savePlan(nextDraft)
-      setHighlightedPlanField('itineraryIdeas')
-    },
-    [draft, savePlan],
-  )
-
-  const handleAddTodo = async () => {
-    if (!newTodo.trim()) {
-      setTodoError('Add a checklist item first.')
-      return
-    }
-
-    setIsAddingTodo(true)
-    setTodoError(null)
-
+  const handleOrganizeIntoFinalDoc = async () => {
+    setIsOrganizing(true)
+    setSaveError(null)
     try {
-      const response = await fetch(`/api/trips/${tripId}/plan/todos`, {
+      const response = await fetch(`/api/trips/${tripId}/plan/organize`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ text: newTodo }),
       })
+      const payload = (await response.json()) as PlanSavePayload
 
-      const payload = (await response.json()) as TodoPayload
-
-      if (!response.ok || !payload.todo) {
-        throw new Error(payload.error || 'Unable to add checklist item.')
+      if (!response.ok || !payload.plan) {
+        throw new Error(payload.error || 'Unable to organize final doc.')
       }
 
-      setData((current) =>
-        current
-          ? {
-              ...current,
-              plan: {
-                ...current.plan,
-                todos: [...current.plan.todos, payload.todo!],
-              },
-            }
-          : current,
-      )
-      setNewTodo('')
+      setData((current) => (current ? { ...current, plan: payload.plan! } : current))
+      setDraft((current) => ({
+        ...(current || {}),
+        finalDocContent: payload.plan!.finalDocContent,
+      }))
+      setActivePlannerTab('final-doc')
+      setSaveMessage(payload.usedFallback ? 'Final doc organized with fallback formatting.' : 'Final doc organized.')
     } catch (error) {
-      setTodoError(error instanceof Error ? error.message : 'Unable to add checklist item.')
+      setSaveError(error instanceof Error ? error.message : 'Unable to organize final doc.')
     } finally {
-      setIsAddingTodo(false)
+      setIsOrganizing(false)
     }
   }
 
-  const handleToggleTodo = async (todo: TripPlanTodoRecord) => {
-    setBusyTodoId(todo.id)
-    setTodoError(null)
-
-    try {
-      const response = await fetch(`/api/trips/${tripId}/plan/todos/${todo.id}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ completed: !todo.completed }),
-      })
-
-      const payload = (await response.json()) as TodoPayload
-
-      if (!response.ok || !payload.todo) {
-        throw new Error(payload.error || 'Unable to update checklist item.')
-      }
-
-      setData((current) =>
-        current
-          ? {
-              ...current,
-              plan: {
-                ...current.plan,
-                todos: current.plan.todos.map((item) => (item.id === todo.id ? payload.todo! : item)),
-              },
-            }
-          : current,
-      )
-    } catch (error) {
-      setTodoError(error instanceof Error ? error.message : 'Unable to update checklist item.')
-    } finally {
-      setBusyTodoId(null)
+  const handleSaveFinalDoc = async (content: string) => {
+    const nextDraft = {
+      ...(draft || {}),
+      finalDocContent: content,
     }
-  }
-
-  const handleDeleteTodo = async (todoId: string) => {
-    setBusyTodoId(todoId)
-    setTodoError(null)
-
-    try {
-      const response = await fetch(`/api/trips/${tripId}/plan/todos/${todoId}`, {
-        method: 'DELETE',
-      })
-
-      const payload = (await response.json()) as { success?: boolean; error?: string }
-
-      if (!response.ok) {
-        throw new Error(payload.error || 'Unable to delete checklist item.')
-      }
-
-      setData((current) =>
-        current
-          ? {
-              ...current,
-              plan: {
-                ...current.plan,
-                todos: current.plan.todos.filter((item) => item.id !== todoId),
-              },
-            }
-          : current,
-      )
-    } catch (error) {
-      setTodoError(error instanceof Error ? error.message : 'Unable to delete checklist item.')
-    } finally {
-      setBusyTodoId(null)
-    }
+    await savePlan(nextDraft)
   }
 
   if (isLoading) {
@@ -565,17 +286,16 @@ export default function PlanPage() {
         <EventTopBar
           tripId={tripId}
           tripName={data.trip.name}
-          dateRange={formatDateRange(new Date(data.trip.startDate), new Date(data.trip.endDate))}
+          dateRange={formatDateRange(parseStoredDate(data.trip.startDate), parseStoredDate(data.trip.endDate))}
           responseCount={data.trip.responses.length}
           shareUrl={shareUrl}
           activeTab="plan"
         />
 
-        {/* Featured Trip Snapshot */}
         <TripSnapshot trip={data.trip} plan={data.plan} />
 
         <div className="inline-flex w-fit items-center rounded-2xl border border-border bg-muted/40 p-1 shadow-sm">
-          {(['ideas', 'plan', 'final-doc'] as const).map((tab) => (
+          {(['plan', 'final-doc'] as const).map((tab) => (
             <button
               key={tab}
               type="button"
@@ -586,237 +306,107 @@ export default function PlanPage() {
                   : 'text-muted-foreground hover:bg-background hover:text-foreground'
               }`}
             >
-              {tab === 'ideas' ? 'Ideas' : tab === 'plan' ? 'Plan' : 'Final Doc'}
+              {tab === 'plan' ? 'Plan' : 'Final Doc'}
             </button>
           ))}
         </div>
 
-        {activePlannerTab === 'ideas' ? (
-          ideasContext ? (
-            <TripIdeasTab
-              context={ideasContext}
-              onAddToPlan={handleAddIdeaToPlan}
-              onAddManyToPlan={handleAddManyIdeasToPlan}
-              onApplyDraftToPlan={handleApplyDraftToPlan}
-            />
-          ) : null
-        ) : activePlannerTab === 'final-doc' ? (
-          <FinalDocTab trip={data.trip} plan={data.plan} />
+        {activePlannerTab === 'final-doc' ? (
+          <FinalDocTab trip={data.trip} plan={data.plan} onSave={handleSaveFinalDoc} />
         ) : (
-        <Card className="border-border/60 bg-card shadow-sm">
-          <CardHeader className="pb-4">
-            <CardTitle className="text-xl font-semibold text-foreground">Plan the trip</CardTitle>
-            <CardDescription>
-              Final details, planning notes, and must-do tasks.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {/* Hero section with quick input fields */}
-            <div className="rounded-2xl border border-border bg-card p-6">
-              <div className="flex flex-col gap-4 mb-6">
+          <Card className="border-border/60 bg-card shadow-sm">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-xl font-semibold text-foreground">Plan the trip</CardTitle>
+              <CardDescription>
+                Think of this like a shared trip doc. Jot ideas down under the headers, save over time, then organize it into a polished final doc.
+              </CardDescription>
+            </CardHeader>
+
+            <CardContent className="space-y-8">
+              <div className="rounded-2xl border border-border/60 bg-muted/20 p-5">
+                <div className="grid gap-4 md:grid-cols-[1.2fr_1fr]">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <MapPinned className="size-4 text-primary" />
+                      <label className="text-sm font-semibold text-foreground">Final destination</label>
+                    </div>
+                    <Input
+                      value={draft.finalDestination || ''}
+                      placeholder={suggestions?.topDestination || 'Choose the final destination'}
+                      onChange={(event) => handleDraftChange('finalDestination', event.target.value)}
+                      className="border-border/60"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <CalendarDays className="size-4 text-primary" />
+                      <label className="text-sm font-semibold text-foreground">Final dates</label>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Input
+                        type="date"
+                        value={toDateInputValue(draft.finalStartDate || null)}
+                        onChange={(event) => handleDraftChange('finalStartDate', fromDateInputValue(event.target.value))}
+                        className="border-border/60"
+                      />
+                      <Input
+                        type="date"
+                        value={toDateInputValue(draft.finalEndDate || null)}
+                        onChange={(event) => handleDraftChange('finalEndDate', fromDateInputValue(event.target.value))}
+                        className="border-border/60"
+                      />
+                    </div>
+                    {suggestions?.bestDates && (
+                      <p className="text-xs text-muted-foreground">Suggested from responses: {suggestions.bestDates}</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-primary/15 bg-gradient-to-r from-primary/8 to-fuchsia-500/5 p-4">
                 <div>
-                  <p className="text-base font-semibold text-foreground">Lock in the details</p>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Final destination, dates, and key logistics.
+                  <p className="text-sm font-semibold text-foreground">Working trip doc</p>
+                  <p className="text-sm text-muted-foreground">
+                    Keep rough notes here while the group is figuring things out. When it feels ready, organize it into the Final Doc.
                   </p>
                 </div>
-              </div>
-
-              <div className="grid gap-4 md:grid-cols-[1.2fr_1fr]">
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <MapPinned className="size-4 text-primary" />
-                    <label className="text-sm font-semibold text-foreground">Final destination</label>
-                  </div>
-                  <Input
-                    value={draft.finalDestination || ''}
-                    placeholder={suggestions?.topDestination || 'Choose the final destination'}
-                    onChange={(event) => handleDraftChange('finalDestination', event.target.value)}
-                    className="border-border/60"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <CalendarDays className="size-4 text-primary" />
-                    <label className="text-sm font-semibold text-foreground">Final dates</label>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <Input
-                      type="date"
-                      value={toDateInputValue(draft.finalStartDate || null)}
-                      onChange={(event) => handleDraftChange('finalStartDate', fromDateInputValue(event.target.value))}
-                      className="border-border/60"
-                    />
-                    <Input
-                      type="date"
-                      value={toDateInputValue(draft.finalEndDate || null)}
-                      onChange={(event) => handleDraftChange('finalEndDate', fromDateInputValue(event.target.value))}
-                      className="border-border/60"
-                    />
-                  </div>
-                  {suggestions?.bestDates && (
-                    <p className="text-xs text-muted-foreground">Suggested: {suggestions.bestDates}</p>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Planning sections — cleaner 2-col layout */}
-            <div className="grid gap-5 lg:grid-cols-2">
-              <div
-                className={`rounded-2xl border bg-card p-6 transition-all ${
-                  highlightedPlanField === 'lodgingNotes' || highlightedPlanField === 'transportationNotes'
-                    ? 'border-primary ring-2 ring-primary/20 shadow-sm'
-                    : 'border-border'
-                }`}
-              >
-                <div className="mb-5 flex items-center gap-2">
-                  <PlaneTakeoff className="size-5 text-primary shrink-0" />
-                  <div>
-                    <p className="font-semibold text-foreground text-sm">Travel & Lodging</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">Where to stay and how to get there.</p>
-                  </div>
-                </div>
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-foreground">Lodging</label>
-                    <Textarea
-                      value={draft.lodgingNotes || ''}
-                      onChange={(event) => handleDraftChange('lodgingNotes', event.target.value)}
-                      placeholder={SECTION_PLACEHOLDERS.lodgingNotes}
-                      className="min-h-[140px] resize-none border-border/60"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-foreground">Transportation</label>
-                    <Textarea
-                      value={draft.transportationNotes || ''}
-                      onChange={(event) => handleDraftChange('transportationNotes', event.target.value)}
-                      placeholder={SECTION_PLACEHOLDERS.transportationNotes}
-                      className="min-h-[140px] resize-none border-border/60"
-                    />
-                  </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button variant="outline" onClick={() => void handleSavePlan()} disabled={isSaving}>
+                    {isSaving ? <Spinner className="size-4" /> : 'Save notes'}
+                  </Button>
+                  <Button onClick={() => void handleOrganizeIntoFinalDoc()} disabled={isOrganizing}>
+                    {isOrganizing ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
+                    Organize into Final Doc
+                  </Button>
                 </div>
               </div>
 
-              <div
-                className={`rounded-2xl border bg-card p-6 transition-all ${
-                  highlightedPlanField === 'itineraryIdeas' || highlightedPlanField === 'groupNotes'
-                    ? 'border-primary ring-2 ring-primary/20 shadow-sm'
-                    : 'border-border'
-                }`}
-              >
-                <div className="mb-5 flex items-center gap-2">
-                  <NotebookPen className="size-5 text-primary shrink-0" />
-                  <div>
-                    <p className="font-semibold text-foreground text-sm">Itinerary & Notes</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">The rough plan, all in one spot.</p>
-                  </div>
-                </div>
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-foreground">Itinerary ideas</label>
-                    <Textarea
-                      value={draft.itineraryIdeas || ''}
-                      onChange={(event) => handleDraftChange('itineraryIdeas', event.target.value)}
-                      placeholder={SECTION_PLACEHOLDERS.itineraryIdeas}
-                      className="min-h-[140px] resize-none border-border/60"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-foreground">Group notes</label>
-                    <Textarea
-                      value={draft.groupNotes || ''}
-                      onChange={(event) => handleDraftChange('groupNotes', event.target.value)}
-                      placeholder={SECTION_PLACEHOLDERS.groupNotes}
-                      className="min-h-[140px] resize-none border-border/60"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Checklist */}
-            <div className="rounded-2xl border border-border bg-card p-6">
-              <div className="mb-5 flex items-center gap-2">
-                <CheckSquare className="size-5 text-primary shrink-0" />
-                <div>
-                  <p className="font-semibold text-foreground text-sm">Checklist</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">Track flights, bookings, and prep tasks.</p>
-                </div>
-              </div>
-              <div className="flex gap-2 mb-4">
-                <Input
-                  value={newTodo}
-                  onChange={(event) => setNewTodo(event.target.value)}
-                  placeholder="Add a task like book lodging"
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter') {
-                      event.preventDefault()
-                      void handleAddTodo()
-                    }
-                  }}
-                  className="border-border/60"
-                />
-                <Button onClick={() => void handleAddTodo()} disabled={isAddingTodo} size="sm">
-                  {isAddingTodo ? <Loader2 className="size-4 animate-spin" /> : 'Add'}
-                </Button>
-              </div>
-              {todoError && <p className="mb-3 text-sm text-destructive">{todoError}</p>}
-              <div className="space-y-2">
-                {data.plan.todos.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">Keep it simple: flights, lodging, key bookings, and easy-to-forget details.</p>
-                ) : (
-                  data.plan.todos.map((todo) => (
-                    <div key={todo.id} className="flex items-center gap-3 rounded-lg border border-border/60 bg-muted/40 px-3 py-3 hover:bg-muted/60 transition-colors duration-150">
-                      <Checkbox
-                        checked={todo.completed}
-                        onCheckedChange={() => void handleToggleTodo(todo)}
-                        disabled={busyTodoId === todo.id}
-                      />
-                      <p className={`flex-1 text-sm ${todo.completed ? 'text-muted-foreground line-through' : 'text-foreground'}`}>
-                        {todo.text}
-                      </p>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => void handleDeleteTodo(todo.id)}
-                        disabled={busyTodoId === todo.id}
-                        className="text-xs"
-                      >
-                        Remove
-                      </Button>
+              <div className="space-y-8">
+                {DOC_SECTIONS.map((section) => (
+                  <section key={section.key} className="space-y-3 border-b border-border/50 pb-6 last:border-b-0 last:pb-0">
+                    <div>
+                      <h2 className="text-2xl font-semibold tracking-tight text-foreground">{section.title}</h2>
+                      <p className="mt-1 text-sm text-muted-foreground">{section.description}</p>
                     </div>
-                  ))
-                )}
+                    <Textarea
+                      value={(draft[section.key] as string) || ''}
+                      onChange={(event) => handleDraftChange(section.key, event.target.value)}
+                      placeholder={SECTION_PLACEHOLDERS[section.key as keyof typeof SECTION_PLACEHOLDERS]}
+                      className="min-h-[160px] resize-none border-none bg-transparent px-0 text-base leading-7 shadow-none focus-visible:ring-0"
+                    />
+                  </section>
+                ))}
               </div>
-            </div>
 
-            {/* Save footer */}
-            <div className="flex flex-col gap-3 border-t border-border/50 pt-5 sm:flex-row sm:items-center sm:justify-between">
-              <div className="text-sm">
-                {saveError ? (
-                  <p className="text-destructive">{saveError}</p>
-                ) : saveMessage ? (
-                  <p className="text-primary font-medium">{saveMessage}</p>
-                ) : (
-                  <p className="text-muted-foreground">Auto-saves as you type.</p>
-                )}
-              </div>
-              <Button onClick={handleSavePlan} disabled={isSaving} size="sm">
-                {isSaving ? (
-                  <>
-                    <Spinner className="mr-2 size-4" />
-                    Saving...
-                  </>
-                ) : (
-                  'Save plan'
-                )}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+              {(saveMessage || saveError) && (
+                <div className="rounded-2xl border border-border/60 bg-muted/20 px-4 py-3">
+                  {saveMessage && <p className="text-sm text-foreground">{saveMessage}</p>}
+                  {saveError && <p className="text-sm text-destructive">{saveError}</p>}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         )}
       </div>
     </div>

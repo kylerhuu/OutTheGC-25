@@ -68,11 +68,19 @@ model TripPlan {
   finalDestination    String
   finalStartDate      String?
   finalEndDate        String?
-  itineraryIdeas      String
-  lodgingNotes        String
+  housingNotes        String           @default("")
+  attractionNotes     String           @default("")
+  foodNotes           String           @default("")
+  activityNotes       String           @default("")
+  dayPlanNotes        String           @default("")
   transportationNotes String
-  budgetNotes         String
-  groupNotes          String
+  bookingNotes        String           @default("")
+  otherNotes          String           @default("")
+  finalDocContent     String           @default("")
+  itineraryIdeas      String           @default("")
+  lodgingNotes        String           @default("")
+  budgetNotes         String           @default("")
+  groupNotes          String           @default("")
   createdAt           DateTime         @default(now())
   updatedAt           DateTime         @updatedAt
   trip                Trip             @relation(fields: [tripId], references: [id], onDelete: Cascade)
