@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useParams } from 'next/navigation'
-import { CheckSquare, Loader2 } from 'lucide-react'
+import { CalendarDays, CheckSquare, Loader2, MapPinned, NotebookPen, PlaneTakeoff } from 'lucide-react'
 import { EventTopBar } from '@/components/tripsync/event-top-bar'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -345,35 +346,42 @@ export default function PlanPage() {
           <CardHeader className="pb-4">
             <CardTitle className="text-xl font-semibold text-foreground">Plan the trip</CardTitle>
             <CardDescription>
-              This page is for turning the group decision into a simple trip plan.
+              Final details, planning notes, and must-do tasks.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="rounded-2xl border border-border/60 bg-muted/20 p-5">
-              <div className="space-y-3">
-                <p className="text-sm font-semibold text-foreground">What this page is for</p>
-                <div className="grid gap-2 text-sm text-muted-foreground sm:grid-cols-2">
-                  <p><span className="font-semibold text-foreground">Step 1:</span> choose the final destination</p>
-                  <p><span className="font-semibold text-foreground">Step 2:</span> choose the final dates</p>
-                  <p><span className="font-semibold text-foreground">Step 3:</span> write down the plan</p>
-                  <p><span className="font-semibold text-foreground">Step 4:</span> keep track of what still needs to get done</p>
+            <div className="rounded-3xl border border-primary/15 bg-gradient-to-br from-primary/10 via-sky-500/5 to-background p-5 shadow-sm">
+              <div className="flex flex-col gap-4">
+                <div className="flex flex-wrap gap-2">
+                  <Badge className="bg-background/80 text-foreground shadow-sm">1. Lock it in</Badge>
+                  <Badge className="bg-background/80 text-foreground shadow-sm">2. Add the plan</Badge>
+                  <Badge className="bg-background/80 text-foreground shadow-sm">3. Track the tasks</Badge>
                 </div>
-                <p className="text-sm text-muted-foreground">
-                  If the group is still comparing options or checking who is free, use the <span className="font-medium text-foreground">Results</span> tab instead.
-                </p>
+                <div className="flex flex-col gap-2">
+                  <p className="text-base font-semibold text-foreground">Use this page after the group already picked the trip.</p>
+                  <p className="text-sm text-muted-foreground">
+                    If you still need to compare dates or see who&apos;s free, go back to <span className="font-medium text-foreground">Results</span>.
+                  </p>
+                </div>
               </div>
 
               <div className="mt-4 grid gap-4 md:grid-cols-[1.2fr_1fr]">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-foreground">Step 1: Final destination</label>
+                <div className="space-y-2 rounded-2xl border border-white/50 bg-background/80 p-4 backdrop-blur">
+                  <div className="flex items-center gap-2">
+                    <MapPinned className="size-4 text-primary" />
+                    <label className="text-sm font-semibold text-foreground">Final destination</label>
+                  </div>
                   <Input
                     value={draft.finalDestination || ''}
                     placeholder={suggestions?.topDestination || 'Choose the final destination'}
                     onChange={(event) => handleDraftChange('finalDestination', event.target.value)}
                   />
                 </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-foreground">Step 2: Final dates</label>
+                <div className="space-y-2 rounded-2xl border border-white/50 bg-background/80 p-4 backdrop-blur">
+                  <div className="flex items-center gap-2">
+                    <CalendarDays className="size-4 text-primary" />
+                    <label className="text-sm font-semibold text-foreground">Final dates</label>
+                  </div>
                   <div className="grid grid-cols-2 gap-2">
                     <Input
                       type="date"
@@ -394,10 +402,13 @@ export default function PlanPage() {
             </div>
 
             <div className="grid gap-4 lg:grid-cols-2">
-              <div className="rounded-2xl border border-border/60 bg-background p-4">
+              <div className="rounded-3xl border border-amber-200/60 bg-gradient-to-br from-amber-50 to-background p-4">
                 <div className="mb-4">
-                  <p className="text-sm font-semibold text-foreground">Step 3: Plan the travel details</p>
-                  <p className="text-xs text-muted-foreground">Write down where you want to stay and how everyone will get there.</p>
+                  <div className="flex items-center gap-2">
+                    <PlaneTakeoff className="size-4 text-amber-600" />
+                    <p className="text-sm font-semibold text-foreground">Travel details</p>
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">Where to stay and how to get there.</p>
                 </div>
                 <div className="space-y-4">
                   <div className="space-y-2">
@@ -421,10 +432,13 @@ export default function PlanPage() {
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-border/60 bg-background p-4">
+              <div className="rounded-3xl border border-sky-200/60 bg-gradient-to-br from-sky-50 to-background p-4">
                 <div className="mb-4">
-                  <p className="text-sm font-semibold text-foreground">Step 3: Write down the plan</p>
-                  <p className="text-xs text-muted-foreground">Keep the rough schedule and extra notes in one place.</p>
+                  <div className="flex items-center gap-2">
+                    <NotebookPen className="size-4 text-sky-600" />
+                    <p className="text-sm font-semibold text-foreground">Ideas + notes</p>
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">The rough plan, all in one spot.</p>
                 </div>
                 <div className="space-y-4">
                   <div className="space-y-2">
@@ -449,10 +463,10 @@ export default function PlanPage() {
               </div>
             </div>
 
-            <div className="rounded-xl border border-border/60 bg-muted/20 p-4">
+            <div className="rounded-3xl border border-primary/15 bg-gradient-to-br from-primary/8 via-background to-fuchsia-500/5 p-4">
               <div className="mb-4 flex items-center gap-2">
                 <CheckSquare className="size-4 text-primary" />
-                <p className="text-sm font-semibold text-foreground">Step 4: Checklist</p>
+                <p className="text-sm font-semibold text-foreground">Checklist</p>
               </div>
               <div className="flex gap-2">
                 <Input
@@ -507,7 +521,7 @@ export default function PlanPage() {
                 ) : saveMessage ? (
                   <p className="text-primary">{saveMessage}</p>
                 ) : (
-                  <p className="text-muted-foreground">This page is just for the final trip plan, tasks, and reminders.</p>
+                  <p className="text-muted-foreground">Keep this page for the actual plan, not decision-making.</p>
                 )}
               </div>
               <Button onClick={handleSavePlan} disabled={isSaving}>
