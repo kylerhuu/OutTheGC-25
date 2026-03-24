@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma'
+import { parseComparableDate } from '@/lib/date-utils'
 import type {
   CreateResponseInput,
   CreateTripInput,
@@ -29,13 +30,7 @@ function normalizeInterestName(value: string) {
 }
 
 function normalizeDate(value: string) {
-  const normalized = new Date(value)
-
-  if (Number.isNaN(normalized.getTime())) {
-    throw new Error('Invalid date provided.')
-  }
-
-  return normalized
+  return parseComparableDate(value)
 }
 
 function normalizeList(items: string[] | undefined) {

@@ -6,6 +6,7 @@ import type { DateRange } from 'react-day-picker'
 import { EventTopBar } from '@/components/tripsync/event-top-bar'
 import { EventInputPanel } from '@/components/tripsync/event-input-panel'
 import { EventSummaryPanel } from '@/components/tripsync/event-summary-panel'
+import { parseStoredDate, toDateOnlyString } from '@/lib/date-utils'
 import type { CreateResponseInput, PublicResponseRecord, ResponseRecord, TripWithResponses } from '@/lib/trip-types'
 
 export interface ParticipantData {
@@ -105,8 +106,8 @@ function responseToParticipant(response: PublicResponseRecord | ResponseRecord):
     availability:
       response.availabilityStart && response.availabilityEnd
         ? {
-            from: new Date(response.availabilityStart),
-            to: new Date(response.availabilityEnd),
+            from: parseStoredDate(response.availabilityStart),
+            to: parseStoredDate(response.availabilityEnd),
           }
         : null,
     destinations: response.destinations,
@@ -234,8 +235,8 @@ export default function EventPage() {
   }) => {
     const payload: CreateResponseInput = {
       name: input.name,
-      availabilityStart: input.availability?.from?.toISOString() || null,
-      availabilityEnd: input.availability?.to?.toISOString() || null,
+      availabilityStart: input.availability?.from ? toDateOnlyString(input.availability.from) : null,
+      availabilityEnd: input.availability?.to ? toDateOnlyString(input.availability.to) : null,
       destinations: input.destinations,
       budget: input.budget,
       interests: input.interests,
@@ -364,7 +365,7 @@ export default function EventPage() {
           <EventTopBar
             tripId={tripId}
             tripName={trip.name}
-            dateRange={formatDateRange(new Date(trip.startDate), new Date(trip.endDate))}
+            dateRange={formatDateRange(parseStoredDate(trip.startDate), parseStoredDate(trip.endDate))}
             responseCount={participants.length}
             shareUrl={shareUrl}
             activeTab="responses"
@@ -374,7 +375,7 @@ export default function EventPage() {
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
             <div className="lg:col-span-3">
               <EventInputPanel
-                tripDateRange={{ from: new Date(trip.startDate), to: new Date(trip.endDate) }}
+                tripDateRange={{ from: parseStoredDate(trip.startDate), to: parseStoredDate(trip.endDate) }}
                 destinationOptions={getDestinationOptions(trip.destinationOptions)}
                 interestOptions={getInterestOptions(trip.interestOptions)}
                 onSubmit={handleSubmit}

@@ -6,6 +6,7 @@ import { Calendar, DollarSign, Heart, MapPin, MessageSquare, Users } from 'lucid
 import { EventTopBar } from '@/components/tripsync/event-top-bar'
 import { BestTripOption } from '@/components/tripsync/best-trip-option'
 import { AvailabilityHeatmap } from '@/components/tripsync/availability-heatmap'
+import { parseStoredDate } from '@/lib/date-utils'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { Slider } from '@/components/ui/slider'
@@ -60,8 +61,8 @@ function responseToParticipant(response: PublicResponseRecord): ParticipantData 
     availability:
       response.availabilityStart && response.availabilityEnd
         ? {
-            from: new Date(response.availabilityStart),
-            to: new Date(response.availabilityEnd),
+            from: parseStoredDate(response.availabilityStart),
+            to: parseStoredDate(response.availabilityEnd),
           }
         : null,
     destinations: response.destinations,
@@ -241,8 +242,8 @@ export default function ResultsPage() {
   const bestWindow = useMemo(() => {
     if (!trip) return null
     return getBestWindow(participants, {
-      from: new Date(trip.startDate),
-      to: new Date(trip.endDate),
+      from: parseStoredDate(trip.startDate),
+      to: parseStoredDate(trip.endDate),
     }, tripDurationDays)
   }, [participants, trip, tripDurationDays])
 
@@ -253,7 +254,7 @@ export default function ResultsPage() {
       Math.max(
         1,
         Math.floor(
-          (new Date(trip.endDate).getTime() - new Date(trip.startDate).getTime()) / (1000 * 60 * 60 * 24),
+          (parseStoredDate(trip.endDate).getTime() - parseStoredDate(trip.startDate).getTime()) / (1000 * 60 * 60 * 24),
         ) + 1,
       ),
     )
@@ -299,7 +300,7 @@ export default function ResultsPage() {
         <EventTopBar
           tripId={tripId}
           tripName={trip.name}
-          dateRange={formatDateRange(new Date(trip.startDate), new Date(trip.endDate))}
+          dateRange={formatDateRange(parseStoredDate(trip.startDate), parseStoredDate(trip.endDate))}
           responseCount={participants.length}
           shareUrl={shareUrl}
           activeTab="results"
@@ -386,7 +387,7 @@ export default function ResultsPage() {
         {/* Availability heatmap */}
         <AvailabilityHeatmap
           participants={participants}
-          tripDateRange={{ from: new Date(trip.startDate), to: new Date(trip.endDate) }}
+          tripDateRange={{ from: parseStoredDate(trip.startDate), to: parseStoredDate(trip.endDate) }}
           tripDurationDays={tripDurationDays}
         />
 
