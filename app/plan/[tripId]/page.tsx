@@ -248,9 +248,70 @@ export default function PlanPage() {
 
       setDraft(nextDraft)
       await savePlan(nextDraft)
-      setActivePlannerTab('plan')
       setHighlightedPlanField(field)
       return { added: true }
+    },
+    [draft, savePlan],
+  )
+
+  const handleAddManyIdeasToPlan = useCallback(
+    async (items: Array<{ group: IdeaGroupKey; text: string }>) => {
+      if (!draft) {
+        throw new Error('Plan is not ready yet.')
+      }
+
+      const nextDraft: UpdateTripPlanInput = { ...draft }
+      let addedCount = 0
+      let duplicateCount = 0
+      const touchedFields = new Set<keyof UpdateTripPlanInput>()
+
+      for (const item of items) {
+        const trimmedText = item.text.trim()
+        if (!trimmedText) continue
+
+        const field: keyof UpdateTripPlanInput =
+          item.group === 'stays'
+            ? 'lodgingNotes'
+            : item.group === 'transport'
+              ? 'transportationNotes'
+              : item.group === 'misc'
+                ? 'groupNotes'
+                : 'itineraryIdeas'
+
+        const currentValue = (nextDraft[field] ?? '').trim()
+        const existingLines = currentValue
+          .split('\n')
+          .map((line) => line.replace(/^[-*]\s*/, '').trim().toLowerCase())
+          .filter(Boolean)
+
+        if (existingLines.includes(trimmedText.toLowerCase())) {
+          duplicateCount += 1
+          continue
+        }
+
+        const bullet = `- ${trimmedText}`
+        nextDraft[field] = currentValue ? `${currentValue}\n${bullet}` : bullet
+        touchedFields.add(field)
+        addedCount += 1
+      }
+
+      if (addedCount === 0) {
+        return { addedCount, duplicateCount }
+      }
+
+      setDraft(nextDraft)
+      await savePlan(nextDraft)
+
+      const highlightPriority: Array<keyof UpdateTripPlanInput> = [
+        'lodgingNotes',
+        'transportationNotes',
+        'itineraryIdeas',
+        'groupNotes',
+      ]
+      const firstTouched = highlightPriority.find((field) => touchedFields.has(field)) ?? null
+      setHighlightedPlanField(firstTouched)
+
+      return { addedCount, duplicateCount }
     },
     [draft, savePlan],
   )
@@ -430,7 +491,7 @@ export default function PlanPage() {
         </div>
 
         {activePlannerTab === 'ideas' ? (
-          <TripIdeasTab onAddToPlan={handleAddIdeaToPlan} />
+          <TripIdeasTab onAddToPlan={handleAddIdeaToPlan} onAddManyToPlan={handleAddManyIdeasToPlan} />
         ) : activePlannerTab === 'final-doc' ? (
           <FinalDocTab trip={data.trip} plan={data.plan} />
         ) : (

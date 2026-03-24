@@ -1,7 +1,8 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { Lightbulb, Plus } from 'lucide-react'
+import { CheckSquare, Lightbulb, Loader2, Plus } from 'lucide-react'
+import { Checkbox } from '@/components/ui/checkbox'
 import { toast } from '@/hooks/use-toast'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -14,6 +15,16 @@ export type IdeaGroupKey = 'stays' | 'places' | 'food' | 'transport' | 'misc'
 interface IdeaItem {
   id: string
   text: string
+}
+
+interface PreservedSection {
+  title: string
+  items: string[]
+}
+
+interface SuggestedItinerarySection {
+  title: string
+  items: string[]
 }
 
 type OrganizedIdeas = Record<IdeaGroupKey, IdeaItem[]>
@@ -36,20 +47,73 @@ const EMPTY_GROUPS: OrganizedIdeas = {
 
 interface TripIdeasTabProps {
   onAddToPlan: (group: IdeaGroupKey, text: string, ideaId: string) => Promise<{ added: boolean }>
+  onAddManyToPlan: (items: Array<{ group: IdeaGroupKey; text: string; ideaId: string }>) => Promise<{
+    addedCount: number
+    duplicateCount: number
+  }>
 }
 
-export function TripIdeasTab({ onAddToPlan }: TripIdeasTabProps) {
+export function TripIdeasTab({ onAddToPlan, onAddManyToPlan }: TripIdeasTabProps) {
   const [rawIdeas, setRawIdeas] = useState('')
   const [organizedIdeas, setOrganizedIdeas] = useState<OrganizedIdeas>(EMPTY_GROUPS)
+  const [preservedSections, setPreservedSections] = useState<PreservedSection[]>([])
+  const [suggestedItinerary, setSuggestedItinerary] = useState<SuggestedItinerarySection[]>([])
+  const [notesSummary, setNotesSummary] = useState('')
   const [addedIdeaIds, setAddedIdeaIds] = useState<string[]>([])
+  const [selectedIdeaIds, setSelectedIdeaIds] = useState<string[]>([])
+  const [isOrganizing, setIsOrganizing] = useState(false)
 
   const hasOrganizedIdeas = useMemo(
     () => Object.values(organizedIdeas).some((group) => group.length > 0),
     [organizedIdeas],
   )
 
-  const handleOrganizeIdeas = () => {
-    setOrganizedIdeas(parseIdeas(rawIdeas))
+  const handleOrganizeIdeas = async (mode: 'organize' | 'build_itinerary') => {
+    if (!rawIdeas.trim()) {
+      toast({
+        title: 'Paste some ideas first',
+        description: 'Add notes, links, or places before organizing.',
+      })
+      return
+    }
+
+    setIsOrganizing(true)
+
+    try {
+      const response = await fetch('/api/trips/organize-ideas', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ text: rawIdeas, mode }),
+      })
+
+      const payload = (await response.json()) as {
+        organizedIdeas?: Record<IdeaGroupKey, string[]>
+        preservedSections?: PreservedSection[]
+        suggestedItinerary?: SuggestedItinerarySection[]
+        notesSummary?: string
+        error?: string
+      }
+
+      if (!response.ok || !payload.organizedIdeas) {
+        throw new Error(payload.error || 'Could not organize these ideas.')
+      }
+
+      setOrganizedIdeas(convertOrganizedIdeas(payload.organizedIdeas))
+      setPreservedSections(payload.preservedSections ?? [])
+      setSuggestedItinerary(payload.suggestedItinerary ?? [])
+      setNotesSummary(payload.notesSummary ?? '')
+      setAddedIdeaIds([])
+      setSelectedIdeaIds([])
+    } catch (error) {
+      toast({
+        title: 'Could not organize ideas',
+        description: error instanceof Error ? error.message : 'Please try again.',
+      })
+    } finally {
+      setIsOrganizing(false)
+    }
   }
 
   const handleIdeaChange = (group: IdeaGroupKey, ideaId: string, value: string) => {
@@ -84,6 +148,42 @@ export function TripIdeasTab({ onAddToPlan }: TripIdeasTabProps) {
     }
   }
 
+  const toggleIdeaSelection = (ideaId: string) => {
+    setSelectedIdeaIds((current) =>
+      current.includes(ideaId) ? current.filter((id) => id !== ideaId) : [...current, ideaId],
+    )
+  }
+
+  const handleAddMany = async (items: Array<{ group: IdeaGroupKey; ideaId: string; text: string }>) => {
+    if (items.length === 0) return
+
+    try {
+      const result = await onAddManyToPlan(items)
+      const newlyAddedIds = items
+        .filter((item) => !addedIdeaIds.includes(item.ideaId))
+        .map((item) => item.ideaId)
+
+      if (result.addedCount > 0) {
+        setAddedIdeaIds((current) => Array.from(new Set([...current, ...newlyAddedIds])))
+      }
+
+      setSelectedIdeaIds((current) => current.filter((id) => !items.some((item) => item.ideaId === id)))
+
+      toast({
+        title: result.addedCount > 0 ? 'Ideas added to plan' : 'Everything was already in plan',
+        description:
+          result.addedCount > 0
+            ? `${result.addedCount} added${result.duplicateCount > 0 ? `, ${result.duplicateCount} already existed` : ''}.`
+            : `${result.duplicateCount} already existed in the matching plan sections.`,
+      })
+    } catch (error) {
+      toast({
+        title: 'Could not add ideas',
+        description: error instanceof Error ? error.message : 'Please try again.',
+      })
+    }
+  }
+
   return (
     <Card className="border-border/60 bg-card shadow-sm">
       <CardHeader className="pb-4">
@@ -108,8 +208,27 @@ export function TripIdeasTab({ onAddToPlan }: TripIdeasTabProps) {
             placeholder={`Paste anything here...\n- hotel links\n- places to visit\n- TikTok ideas\n- random notes`}
             className="min-h-[240px] resize-none border-border/60 bg-background/90"
           />
-          <div className="mt-4 flex justify-end">
-            <Button onClick={handleOrganizeIdeas}>Organize ideas</Button>
+          <div className="mt-4 flex flex-wrap justify-end gap-2">
+            <Button variant="outline" onClick={() => void handleOrganizeIdeas('organize')} disabled={isOrganizing}>
+              {isOrganizing ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" />
+                  Organizing...
+                </>
+              ) : (
+                'Organize ideas'
+              )}
+            </Button>
+            <Button onClick={() => void handleOrganizeIdeas('build_itinerary')} disabled={isOrganizing}>
+              {isOrganizing ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" />
+                  Building...
+                </>
+              ) : (
+                'Build itinerary'
+              )}
+            </Button>
           </div>
         </div>
 
@@ -119,6 +238,107 @@ export function TripIdeasTab({ onAddToPlan }: TripIdeasTabProps) {
             <p className="text-xs text-muted-foreground">Review, edit, and save the useful ones.</p>
           </div>
 
+          {(notesSummary || preservedSections.length > 0) && (
+            <div className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
+              <div className="rounded-2xl border border-border/60 bg-muted/20 p-4">
+                <p className="text-sm font-semibold text-foreground">What the AI picked up</p>
+                <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                  {notesSummary || 'No summary yet.'}
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-border/60 bg-background p-4">
+                <p className="text-sm font-semibold text-foreground">Preserved outline</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  If your notes already had day structure or section headings, they show up here.
+                </p>
+                {preservedSections.length === 0 ? (
+                  <p className="mt-3 text-sm text-muted-foreground">No structured outline was detected.</p>
+                ) : (
+                  <div className="mt-4 space-y-4">
+                    {preservedSections.map((section) => (
+                      <div key={section.title} className="rounded-xl border border-border/60 bg-muted/20 p-3">
+                        <p className="text-sm font-semibold text-foreground">{section.title}</p>
+                        <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
+                          {section.items.map((item) => (
+                            <li key={`${section.title}-${item}`} className="flex gap-2">
+                              <span className="mt-2 size-1 rounded-full bg-primary/70" />
+                              <span>{item}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {suggestedItinerary.length > 0 && (
+            <div className="rounded-2xl border border-border/60 bg-background p-4">
+              <p className="text-sm font-semibold text-foreground">Suggested itinerary</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                A day-by-day draft based on the notes you pasted.
+              </p>
+              <div className="mt-4 space-y-4">
+                {suggestedItinerary.map((section) => (
+                  <div key={section.title} className="rounded-xl border border-border/60 bg-muted/20 p-3">
+                    <p className="text-sm font-semibold text-foreground">{section.title}</p>
+                    <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
+                      {section.items.map((item) => (
+                        <li key={`${section.title}-${item}`} className="flex gap-2">
+                          <span className="mt-2 size-1 rounded-full bg-primary/70" />
+                          <span>{item}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {hasOrganizedIdeas && (
+            <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-border/60 bg-muted/20 p-3">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() =>
+                  void handleAddMany(
+                    (Object.keys(GROUP_LABELS) as IdeaGroupKey[]).flatMap((group) =>
+                      organizedIdeas[group]
+                        .filter((item) => !addedIdeaIds.includes(item.id))
+                        .map((item) => ({ group, ideaId: item.id, text: item.text })),
+                    ),
+                  )
+                }
+              >
+                <Plus className="size-3.5" />
+                Add all to plan
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={selectedIdeaIds.length === 0}
+                onClick={() =>
+                  void handleAddMany(
+                    (Object.keys(GROUP_LABELS) as IdeaGroupKey[]).flatMap((group) =>
+                      organizedIdeas[group]
+                        .filter((item) => selectedIdeaIds.includes(item.id))
+                        .map((item) => ({ group, ideaId: item.id, text: item.text })),
+                    ),
+                  )
+                }
+              >
+                <CheckSquare className="size-3.5" />
+                Add selected ({selectedIdeaIds.length})
+              </Button>
+            </div>
+          )}
+
           {!hasOrganizedIdeas ? (
             <div className="rounded-2xl border border-dashed border-border/70 bg-muted/20 p-8 text-center">
               <p className="text-sm text-muted-foreground">Paste your messy notes first, then click <span className="font-medium text-foreground">Organize ideas</span>.</p>
@@ -127,9 +347,27 @@ export function TripIdeasTab({ onAddToPlan }: TripIdeasTabProps) {
             <div className="grid gap-4 lg:grid-cols-2">
               {(Object.keys(GROUP_LABELS) as IdeaGroupKey[]).map((group) => (
                 <div key={group} className="rounded-2xl border border-border/60 bg-background p-4">
-                  <div className="mb-3 flex items-center justify-between">
-                    <p className="text-sm font-semibold text-foreground">{GROUP_LABELS[group]}</p>
-                    <Badge variant="outline">{organizedIdeas[group].length}</Badge>
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-semibold text-foreground">{GROUP_LABELS[group]}</p>
+                      <Badge variant="outline">{organizedIdeas[group].length}</Badge>
+                    </div>
+                    {organizedIdeas[group].length > 0 && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        onClick={() =>
+                          void handleAddMany(
+                            organizedIdeas[group]
+                              .filter((item) => !addedIdeaIds.includes(item.id))
+                              .map((item) => ({ group, ideaId: item.id, text: item.text })),
+                          )
+                        }
+                      >
+                        Add group
+                      </Button>
+                    )}
                   </div>
                   {organizedIdeas[group].length === 0 ? (
                     <p className="text-sm text-muted-foreground">Nothing here yet.</p>
@@ -140,11 +378,19 @@ export function TripIdeasTab({ onAddToPlan }: TripIdeasTabProps) {
 
                         return (
                           <div key={item.id} className="rounded-xl border border-border/60 bg-muted/20 p-3">
-                            <Input
-                              value={item.text}
-                              onChange={(event) => handleIdeaChange(group, item.id, event.target.value)}
-                              className="border-border/60 bg-background"
-                            />
+                            <div className="flex items-start gap-3">
+                              <Checkbox
+                                checked={selectedIdeaIds.includes(item.id) || isAdded}
+                                onCheckedChange={() => toggleIdeaSelection(item.id)}
+                                disabled={isAdded}
+                                className="mt-2"
+                              />
+                              <Input
+                                value={item.text}
+                                onChange={(event) => handleIdeaChange(group, item.id, event.target.value)}
+                                className="border-border/60 bg-background"
+                              />
+                            </div>
                             <div className="mt-3 flex justify-end">
                               <Button
                                 type="button"
@@ -172,23 +418,13 @@ export function TripIdeasTab({ onAddToPlan }: TripIdeasTabProps) {
   )
 }
 
-function parseIdeas(rawIdeas: string): OrganizedIdeas {
-  const lines = rawIdeas
-    .split('\n')
-    .flatMap((line) => line.split('•'))
-    .map((line) => line.replace(/^[-*]\s*/, '').trim())
-    .filter(Boolean)
-
-  return lines.reduce<OrganizedIdeas>((groups, line, index) => {
-    const normalized = line.toLowerCase()
-    const category = categorizeIdea(normalized)
-
-    groups[category].push({
-      id: `${category}-${index}-${normalized.slice(0, 12)}`,
-      text: line,
-    })
-
-    return groups
+function convertOrganizedIdeas(groups: Record<IdeaGroupKey, string[]>): OrganizedIdeas {
+  return (Object.keys(GROUP_LABELS) as IdeaGroupKey[]).reduce<OrganizedIdeas>((acc, group) => {
+    acc[group] = groups[group].map((text, index) => ({
+      id: `${group}-${index}-${text.toLowerCase().slice(0, 12)}`,
+      text,
+    }))
+    return acc
   }, {
     stays: [],
     places: [],
@@ -196,24 +432,4 @@ function parseIdeas(rawIdeas: string): OrganizedIdeas {
     transport: [],
     misc: [],
   })
-}
-
-function categorizeIdea(line: string): IdeaGroupKey {
-  if (/(hotel|airbnb|hostel|stay|resort|villa|suite|bnb|accommodation)/i.test(line)) {
-    return 'stays'
-  }
-
-  if (/(restaurant|food|cafe|coffee|brunch|dinner|lunch|bar|bakery)/i.test(line)) {
-    return 'food'
-  }
-
-  if (/(train|flight|bus|uber|lyft|taxi|ferry|drive|airport|car rental|rental car|metro)/i.test(line)) {
-    return 'transport'
-  }
-
-  if (/(museum|beach|park|viewpoint|market|temple|spot|place|visit|activity|hike|shopping|club|tiktok)/i.test(line)) {
-    return 'places'
-  }
-
-  return 'misc'
 }
