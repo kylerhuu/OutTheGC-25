@@ -4,6 +4,15 @@ import { z } from 'zod'
 const requestSchema = z.object({
   text: z.string().trim().min(1).max(20000),
   mode: z.enum(['organize', 'build_itinerary']).default('organize'),
+  intent: z
+    .enum([
+      'organize_notes',
+      'make_itinerary',
+      'group_by_location',
+      'pull_stays_transport',
+      'turn_into_final_doc',
+    ])
+    .optional(),
   context: z
     .object({
       tripName: z.string().optional(),
@@ -26,6 +35,8 @@ const requestSchema = z.object({
 })
 
 const organizedIdeasSchema = z.object({
+  message: z.string(),
+  detectedStructure: z.enum(['days', 'locations', 'mixed', 'loose']),
   organizedIdeas: z.object({
     stays: z.array(z.string()),
     places: z.array(z.string()),
@@ -67,11 +78,7 @@ export async function POST(request: Request) {
       },
       body: JSON.stringify({
         model: process.env.OPENAI_IDEAS_MODEL || 'gpt-4o-mini',
-        instructions:
-          body.mode === 'build_itinerary'
-            ? 'You turn trip notes into a useful planning output. Return only structured JSON. Preserve any existing day-based or section-based structure in preservedSections. Also create suggestedPlanSections as the best final planning shape for the input and context. The output does not always need to be by day. If the content is clearly organized by locations, neighborhoods, things to see, transport steps, or another useful structure, use that instead. If the content already has a strong itinerary, keep that intent and lightly refine it instead of replacing it. If the input already contains explicit Day 1 / Day 2 / Day 3 style headings, preserve that structure and do not create more day-based sections than already exist in the user input. If the trip has a known duration, never create more day-based sections than that duration and never compress a long multi-day itinerary into just a few generic days. Keep wording close to the user input, but clean obvious clutter. Put each item in exactly one category: stays, places, food, transport, or misc. notesSummary should be 1-2 short sentences that summarize the trip ideas without inventing details.'
-            : 'You organize messy trip-planning notes into categories while preserving useful structure. Return only structured JSON. Keep wording close to the user input, but clean obvious clutter. If the user already organized notes by day, section, or ordered outline, preserve that structure in preservedSections instead of flattening it. Split combined notes into separate concise items when helpful. Put each item in exactly one category: stays, places, food, transport, or misc. For organize mode, suggestedPlanSections should usually be empty unless the user already provided a clear planning structure that should be mirrored. notesSummary should be 1-2 short sentences that summarize the trip ideas without inventing details.'
-            + buildContextInstructions(body.context),
+        instructions: buildInstructions(body.mode, body.intent, body.context),
         input: buildInputPayload(body.text, body.context),
         text: {
           format: {
@@ -82,6 +89,11 @@ export async function POST(request: Request) {
               type: 'object',
               additionalProperties: false,
               properties: {
+                message: { type: 'string' },
+                detectedStructure: {
+                  type: 'string',
+                  enum: ['days', 'locations', 'mixed', 'loose'],
+                },
                 organizedIdeas: {
                   type: 'object',
                   additionalProperties: false,
@@ -141,7 +153,14 @@ export async function POST(request: Request) {
                 },
                 notesSummary: { type: 'string' },
               },
-              required: ['organizedIdeas', 'preservedSections', 'suggestedPlanSections', 'notesSummary'],
+              required: [
+                'message',
+                'detectedStructure',
+                'organizedIdeas',
+                'preservedSections',
+                'suggestedPlanSections',
+                'notesSummary',
+              ],
             },
           },
         },
@@ -252,6 +271,31 @@ function buildContextInstructions(context: z.infer<typeof requestSchema>['contex
   if (!context) return ''
 
   return `\nUse the provided trip context when it helps: preserve dates, destination, lodging, transport, budget, and existing planning notes. Respect the real trip duration when deciding whether a plan should be split by days or by another structure. If the trip duration is known, treat it as a hard upper bound for day-based sections. If the user already supplied explicit day headings, preserve their day count and order. Do not throw away meaningful details from the user input just because they do not fit a simple category.`
+}
+
+function buildInstructions(
+  mode: z.infer<typeof requestSchema>['mode'],
+  intent: z.infer<typeof requestSchema>['intent'],
+  context: z.infer<typeof requestSchema>['context'],
+) {
+  const base =
+    mode === 'build_itinerary'
+      ? 'You turn trip notes into a useful planning output. Return only structured JSON. Preserve any existing day-based or section-based structure in preservedSections. Also create suggestedPlanSections as the best final planning shape for the input and context. The output does not always need to be by day. If the content is clearly organized by locations, neighborhoods, things to see, transport steps, or another useful structure, use that instead. If the content already has a strong itinerary, keep that intent and lightly refine it instead of replacing it. If the input already contains explicit Day 1 / Day 2 / Day 3 style headings, preserve that structure and do not create more day-based sections than already exist in the user input. If the trip has a known duration, never create more day-based sections than that duration and never compress a long multi-day itinerary into just a few generic days.'
+      : 'You organize messy trip-planning notes into categories while preserving useful structure. Return only structured JSON. Keep wording close to the user input, but clean obvious clutter. If the user already organized notes by day, section, or ordered outline, preserve that structure in preservedSections instead of flattening it. Split combined notes into separate concise items when helpful. For organize mode, suggestedPlanSections should usually be empty unless the user already provided a clear planning structure that should be mirrored.'
+
+  const shared =
+    ' Put each item in exactly one category: stays, places, food, transport, or misc. notesSummary should be 1-2 short sentences that summarize the trip ideas without inventing details. detectedStructure must be one of: days, locations, mixed, or loose. message should be a short, helpful assistant reply that explains what you noticed and what structure you chose.'
+
+  const intentInstructions =
+    intent === 'group_by_location'
+      ? ' Prefer grouping the suggested plan by locations, neighborhoods, or destinations instead of days unless the user already clearly wrote a day-by-day plan.'
+      : intent === 'pull_stays_transport'
+        ? ' Focus on extracting lodging and transportation details clearly. suggestedPlanSections can stay empty unless there is an obvious planning structure.'
+        : intent === 'turn_into_final_doc'
+          ? ' Shape suggestedPlanSections like a clean shareable trip document. Prefer sections such as Overview, Stay, Transport, Itinerary, and Notes instead of raw categories when that fits the input.'
+          : ''
+
+  return `${base}${shared}${intentInstructions}${buildContextInstructions(context)}`
 }
 
 function buildInputPayload(text: string, context: z.infer<typeof requestSchema>['context']) {
