@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { Analytics } from '@vercel/analytics/next'
 import { AnimatedBackground } from '@/components/tripsync/animated-background'
+import { Toaster } from '@/components/ui/toaster'
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -24,6 +25,7 @@ export default function RootLayout({
       <body className="font-sans antialiased relative">
         <AnimatedBackground variant="subpage" />
         {children}
+        <Toaster />
         <Analytics />
       </body>
     </html>

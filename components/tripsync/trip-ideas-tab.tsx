@@ -102,7 +102,12 @@ export function TripIdeasTab({ onAddToPlan, onAddManyToPlan }: TripIdeasTabProps
 
       const nextOrganizedIdeas = convertOrganizedIdeas(payload.organizedIdeas)
       const nextPreservedSections = payload.preservedSections ?? []
-      const nextSuggestedItinerary = payload.suggestedItinerary ?? []
+      const nextSuggestedItinerary =
+        (payload.suggestedItinerary ?? []).length > 0
+          ? payload.suggestedItinerary ?? []
+          : mode === 'build_itinerary'
+            ? buildFallbackItinerary(rawIdeas, payload.preservedSections ?? [])
+            : []
       const nextNotesSummary = payload.notesSummary ?? ''
       const hasAnyOutput =
         Object.values(nextOrganizedIdeas).some((group) => group.length > 0) ||
@@ -143,6 +148,23 @@ export function TripIdeasTab({ onAddToPlan, onAddManyToPlan }: TripIdeasTabProps
           toast({
             title: 'Used a simple fallback',
             description: 'The AI response was empty, so a basic organizer was used instead.',
+          })
+          return
+        }
+      }
+
+      if (mode === 'build_itinerary') {
+        const fallbackItinerary = buildFallbackItinerary(rawIdeas, [])
+        if (fallbackItinerary.length > 0) {
+          setOrganizedIdeas(EMPTY_GROUPS)
+          setPreservedSections([])
+          setSuggestedItinerary(fallbackItinerary)
+          setNotesSummary('A simple fallback itinerary was created because the AI response was empty.')
+          setAddedIdeaIds([])
+          setSelectedIdeaIds([])
+          toast({
+            title: 'Used a simple itinerary fallback',
+            description: 'The AI response was empty, so a basic day-by-day outline was created.',
           })
           return
         }
@@ -519,4 +541,32 @@ function categorizeIdea(line: string): IdeaGroupKey {
   }
 
   return 'misc'
+}
+
+function buildFallbackItinerary(rawIdeas: string, preservedSections: PreservedSection[]) {
+  if (preservedSections.length > 0) {
+    return preservedSections
+  }
+
+  const lines = rawIdeas
+    .split('\n')
+    .flatMap((line) => line.split('•'))
+    .map((line) => line.replace(/^[-*]\s*/, '').trim())
+    .filter(Boolean)
+
+  if (lines.length === 0) {
+    return []
+  }
+
+  const daySections: SuggestedItinerarySection[] = []
+  const chunkSize = Math.max(2, Math.ceil(lines.length / 3))
+
+  for (let index = 0; index < lines.length; index += chunkSize) {
+    daySections.push({
+      title: `Day ${daySections.length + 1}`,
+      items: lines.slice(index, index + chunkSize),
+    })
+  }
+
+  return daySections
 }
