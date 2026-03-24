@@ -8,6 +8,12 @@ export interface BestDateWindow {
   minAvailable: number
 }
 
+export interface AvailabilitySpan {
+  startDate: string
+  endDate: string
+  availableCount: number
+}
+
 export function getTripLengthDays(startDate: string, endDate: string) {
   return Math.max(
     1,
@@ -90,4 +96,74 @@ export function getBestDateWindows(
   }
 
   return distinct
+}
+
+export function getBestAvailabilitySpans(
+  responses: PublicResponseRecord[],
+  tripDateRange: { startDate: string; endDate: string },
+): AvailabilitySpan[] {
+  const tripStart = parseStoredDate(tripDateRange.startDate)
+  const tripEnd = parseStoredDate(tripDateRange.endDate)
+  const days: Array<{ date: Date; count: number }> = []
+  const cursor = new Date(tripStart)
+
+  while (cursor <= tripEnd) {
+    const day = new Date(cursor)
+    day.setHours(0, 0, 0, 0)
+
+    const count = responses.filter((response) => {
+      if (!response.availabilityStart || !response.availabilityEnd) return false
+      const availableFrom = parseStoredDate(response.availabilityStart)
+      const availableTo = parseStoredDate(response.availabilityEnd)
+      availableFrom.setHours(0, 0, 0, 0)
+      availableTo.setHours(23, 59, 59, 999)
+      return day >= availableFrom && day <= availableTo
+    }).length
+
+    days.push({ date: new Date(day), count })
+    cursor.setDate(cursor.getDate() + 1)
+  }
+
+  if (days.length === 0) {
+    return []
+  }
+
+  const maxCount = Math.max(...days.map((day) => day.count))
+  if (maxCount <= 0) {
+    return []
+  }
+
+  const spans: AvailabilitySpan[] = []
+  let currentStart: Date | null = null
+  let currentEnd: Date | null = null
+
+  for (const day of days) {
+    if (day.count === maxCount) {
+      if (!currentStart) {
+        currentStart = new Date(day.date)
+      }
+      currentEnd = new Date(day.date)
+      continue
+    }
+
+    if (currentStart && currentEnd) {
+      spans.push({
+        startDate: toDateOnlyString(currentStart),
+        endDate: toDateOnlyString(currentEnd),
+        availableCount: maxCount,
+      })
+    }
+    currentStart = null
+    currentEnd = null
+  }
+
+  if (currentStart && currentEnd) {
+    spans.push({
+      startDate: toDateOnlyString(currentStart),
+      endDate: toDateOnlyString(currentEnd),
+      availableCount: maxCount,
+    })
+  }
+
+  return spans
 }

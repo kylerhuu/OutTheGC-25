@@ -6,7 +6,7 @@ import { Loader2, Sparkles } from 'lucide-react'
 import { EventTopBar } from '@/components/tripsync/event-top-bar'
 import { FinalDocTab } from '@/components/tripsync/final-doc-tab'
 import { TripSnapshot } from '@/components/tripsync/trip-snapshot'
-import { getBestDateWindows, getTripLengthDays } from '@/lib/availability'
+import { getBestAvailabilitySpans, getBestDateWindows, getTripLengthDays } from '@/lib/availability'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Spinner } from '@/components/ui/spinner'
@@ -155,6 +155,14 @@ export default function PlanPage() {
       tripLengthDays,
     )
   }, [data, tripLengthDays])
+
+  const sharedAvailabilitySpans = useMemo(() => {
+    if (!data) return []
+    return getBestAvailabilitySpans(data.trip.responses, {
+      startDate: data.trip.startDate,
+      endDate: data.trip.endDate,
+    })
+  }, [data])
 
   const handleDraftChange = <K extends keyof UpdateTripPlanInput>(key: K, value: UpdateTripPlanInput[K]) => {
     setDraft((current) => ({
@@ -335,6 +343,7 @@ export default function PlanPage() {
                 }}
                 topDestinations={suggestions?.topDestinations}
                 suggestedWindows={suggestedWindows}
+                sharedAvailabilitySpans={sharedAvailabilitySpans}
                 selectedTripLengthDays={tripLengthDays}
                 maxTripLengthDays={maxTripLengthDays}
                 onTripLengthChange={setTripLengthDays}
