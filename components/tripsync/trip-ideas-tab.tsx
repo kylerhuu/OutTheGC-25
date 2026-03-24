@@ -100,13 +100,54 @@ export function TripIdeasTab({ onAddToPlan, onAddManyToPlan }: TripIdeasTabProps
         throw new Error(payload.error || 'Could not organize these ideas.')
       }
 
-      setOrganizedIdeas(convertOrganizedIdeas(payload.organizedIdeas))
-      setPreservedSections(payload.preservedSections ?? [])
-      setSuggestedItinerary(payload.suggestedItinerary ?? [])
-      setNotesSummary(payload.notesSummary ?? '')
+      const nextOrganizedIdeas = convertOrganizedIdeas(payload.organizedIdeas)
+      const nextPreservedSections = payload.preservedSections ?? []
+      const nextSuggestedItinerary = payload.suggestedItinerary ?? []
+      const nextNotesSummary = payload.notesSummary ?? ''
+      const hasAnyOutput =
+        Object.values(nextOrganizedIdeas).some((group) => group.length > 0) ||
+        nextPreservedSections.length > 0 ||
+        nextSuggestedItinerary.length > 0 ||
+        nextNotesSummary.trim().length > 0
+
+      if (!hasAnyOutput) {
+        throw new Error('The AI did not return any usable trip ideas.')
+      }
+
+      setOrganizedIdeas(nextOrganizedIdeas)
+      setPreservedSections(nextPreservedSections)
+      setSuggestedItinerary(nextSuggestedItinerary)
+      setNotesSummary(nextNotesSummary)
       setAddedIdeaIds([])
       setSelectedIdeaIds([])
+
+      toast({
+        title: mode === 'build_itinerary' ? 'Itinerary ready' : 'Ideas organized',
+        description:
+          mode === 'build_itinerary'
+            ? 'Review the suggested day-by-day draft below.'
+            : 'Your ideas were grouped and cleaned up below.',
+      })
     } catch (error) {
+      if (mode === 'organize') {
+        const fallbackIdeas = fallbackOrganizeIdeas(rawIdeas)
+        const hasFallback = Object.values(fallbackIdeas).some((group) => group.length > 0)
+
+        if (hasFallback) {
+          setOrganizedIdeas(fallbackIdeas)
+          setPreservedSections([])
+          setSuggestedItinerary([])
+          setNotesSummary('Fallback organization was used because the AI response was empty.')
+          setAddedIdeaIds([])
+          setSelectedIdeaIds([])
+          toast({
+            title: 'Used a simple fallback',
+            description: 'The AI response was empty, so a basic organizer was used instead.',
+          })
+          return
+        }
+      }
+
       toast({
         title: 'Could not organize ideas',
         description: error instanceof Error ? error.message : 'Please try again.',
@@ -432,4 +473,50 @@ function convertOrganizedIdeas(groups: Record<IdeaGroupKey, string[]>): Organize
     transport: [],
     misc: [],
   })
+}
+
+function fallbackOrganizeIdeas(rawIdeas: string): OrganizedIdeas {
+  const lines = rawIdeas
+    .split('\n')
+    .flatMap((line) => line.split('•'))
+    .map((line) => line.replace(/^[-*]\s*/, '').trim())
+    .filter(Boolean)
+
+  return lines.reduce<OrganizedIdeas>((groups, line, index) => {
+    const normalized = line.toLowerCase()
+    const category = categorizeIdea(normalized)
+
+    groups[category].push({
+      id: `${category}-${index}-${normalized.slice(0, 12)}`,
+      text: line,
+    })
+
+    return groups
+  }, {
+    stays: [],
+    places: [],
+    food: [],
+    transport: [],
+    misc: [],
+  })
+}
+
+function categorizeIdea(line: string): IdeaGroupKey {
+  if (/(hotel|airbnb|hostel|stay|resort|villa|suite|bnb|accommodation)/i.test(line)) {
+    return 'stays'
+  }
+
+  if (/(restaurant|food|cafe|coffee|brunch|dinner|lunch|bar|bakery)/i.test(line)) {
+    return 'food'
+  }
+
+  if (/(train|flight|bus|uber|lyft|taxi|ferry|drive|airport|car rental|rental car|metro)/i.test(line)) {
+    return 'transport'
+  }
+
+  if (/(museum|beach|park|viewpoint|market|temple|spot|place|visit|activity|hike|shopping|club|tiktok)/i.test(line)) {
+    return 'places'
+  }
+
+  return 'misc'
 }
