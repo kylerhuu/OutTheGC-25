@@ -1,8 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { Calendar } from 'lucide-react'
-import { Badge } from '@/components/ui/badge'
+import { CalendarDays, Users } from 'lucide-react'
 import { CopyButton } from '@/components/tripsync/copy-button'
 import { cn } from '@/lib/utils'
 
@@ -30,37 +29,47 @@ export function EventTopBar({
   ] as const
 
   return (
-    <header className="flex flex-col gap-4 rounded-3xl border border-primary/10 bg-gradient-to-br from-cyan-500/8 via-card to-fuchsia-500/8 px-8 py-6 shadow-sm sm:flex-row sm:items-end sm:justify-between">
-      <div className="flex flex-col gap-2">
-        <h1 className="text-2xl font-semibold text-foreground text-balance">{tripName}</h1>
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <Calendar className="size-4" />
-            <span className="text-sm">{dateRange}</span>
+    <header className="rounded-2xl border border-border bg-card px-6 py-5 shadow-sm">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex flex-col gap-3">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight text-foreground text-balance leading-tight">
+              {tripName}
+            </h1>
+            <div className="mt-1.5 flex flex-wrap items-center gap-3">
+              <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                <CalendarDays className="size-3.5 shrink-0 text-primary" />
+                {dateRange}
+              </span>
+              <span className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
+                <Users className="size-3.5 shrink-0 text-primary" />
+                {responseCount} {responseCount === 1 ? 'person' : 'people'}
+              </span>
+            </div>
           </div>
-          <Badge variant="secondary" className="border border-primary/10 bg-primary/10 text-xs font-medium text-primary">
-            {responseCount} {responseCount === 1 ? 'response' : 'responses'}
-          </Badge>
+
+          <div className="inline-flex w-fit items-center rounded-xl border border-border bg-muted/50 p-1">
+            {tabs.map((tab) => (
+              <Link
+                key={tab.key}
+                href={tab.href}
+                className={cn(
+                  'rounded-lg px-3.5 py-1.5 text-sm font-medium transition-all duration-150',
+                  activeTab === tab.key
+                    ? 'bg-primary text-primary-foreground shadow-sm'
+                    : 'text-muted-foreground hover:bg-background hover:text-foreground',
+                )}
+              >
+                {tab.label}
+              </Link>
+            ))}
+          </div>
         </div>
-        <div className="inline-flex w-fit items-center rounded-2xl border border-primary/10 bg-background/80 p-1 shadow-sm backdrop-blur">
-          {tabs.map((tab) => (
-            <Link
-              key={tab.key}
-              href={tab.href}
-              className={cn(
-                'rounded-xl px-3 py-1.5 text-sm font-medium transition-colors',
-                activeTab === tab.key
-                  ? 'bg-primary text-primary-foreground shadow-sm'
-                  : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground',
-              )}
-            >
-              {tab.label}
-            </Link>
-          ))}
+
+        <div className="shrink-0">
+          <CopyButton textToCopy={shareUrl} />
         </div>
       </div>
-      
-      <CopyButton textToCopy={shareUrl} />
     </header>
   )
 }

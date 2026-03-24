@@ -15,44 +15,44 @@ export default function Home() {
         <OutTheGCLogo markClassName="h-9 w-9" textClassName="h-7" />
         <button
           onClick={() => setModalOpen(true)}
-          className="text-sm font-medium text-primary hover:opacity-80 transition-opacity"
+          className="text-sm font-semibold text-primary hover:text-primary/80 transition-colors duration-150"
         >
           Create Trip
         </button>
       </header>
 
       {/* Hero */}
-      <section className="flex-1 flex flex-col items-center justify-center text-center px-6 pt-16 pb-8">
-        <div className="inline-flex items-center gap-2 bg-accent/40 text-accent-foreground text-xs font-semibold px-3.5 py-1.5 rounded-full mb-8">
+      <section className="flex-1 flex flex-col items-center justify-center text-center px-6 pt-12 pb-8">
+        <div className="inline-flex items-center gap-2 bg-primary/10 text-primary text-xs font-semibold px-3.5 py-1.5 rounded-full mb-7">
           <span className="w-1.5 h-1.5 rounded-full bg-primary inline-block" />
           Finally get your trip out of the gc
         </div>
 
-        <h1 className="text-5xl sm:text-6xl font-bold text-foreground tracking-tight leading-tight text-balance max-w-2xl mb-5">
+        <h1 className="text-5xl sm:text-6xl font-bold text-foreground tracking-tight leading-[1.08] text-balance max-w-2xl mb-5">
           Stop planning trips in 67 separate messages
         </h1>
 
-        <p className="text-lg text-muted-foreground max-w-xl leading-relaxed text-pretty mb-10">
-          See availability, destination votes, and everyone&apos;s preferences in one place.
+        <p className="text-base text-muted-foreground max-w-md leading-relaxed text-pretty mb-9">
+          See everyone&apos;s availability, destination votes, and preferences — all in one place.
         </p>
 
-        <div className="flex flex-col items-center gap-3">
+        <div className="flex flex-col items-center gap-2.5">
           <button
             onClick={() => setModalOpen(true)}
-            className="bg-primary text-primary-foreground px-8 py-3.5 rounded-xl text-base font-semibold hover:opacity-90 active:scale-[0.98] transition-all shadow-md shadow-primary/20"
+            className="bg-primary text-primary-foreground px-8 py-3.5 rounded-xl text-sm font-semibold hover:bg-primary/90 active:scale-[0.98] transition-all duration-150 shadow-sm shadow-primary/20"
           >
-            Create Trip
+            Create a Trip
           </button>
           <span className="text-xs text-muted-foreground">No login required</span>
         </div>
       </section>
 
-      {/* Preview card */}
-      <section className="flex flex-col items-center px-6 pb-24 pt-8">
-        <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest mb-6">
+      {/* Preview cards */}
+      <section className="flex flex-col items-center px-6 pb-24 pt-6">
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-6">
           Two ways this goes
         </p>
-        <div className="grid w-full max-w-5xl gap-6 md:grid-cols-2">
+        <div className="grid w-full max-w-5xl gap-5 md:grid-cols-2">
           <TripPreviewCard
             label="Polished example"
             tripName="Summer Senior Trip"
@@ -62,7 +62,7 @@ export default function Home() {
             bestOverlap="Jun 18–22"
             topPicks="Barcelona, Lisbon"
             budget="$$"
-            missing="2 people still haven’t answered"
+            missing="2 people still haven't answered"
             note="Maya: free after graduation weekend"
             onAction={() => setModalOpen(true)}
           />

@@ -6,7 +6,6 @@ import { Calendar, DollarSign, Heart, MapPin, MessageSquare, Users } from 'lucid
 import { EventTopBar } from '@/components/tripsync/event-top-bar'
 import { AvailabilityHeatmap } from '@/components/tripsync/availability-heatmap'
 import { Badge } from '@/components/ui/badge'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { Slider } from '@/components/ui/slider'
 import type { PublicResponseRecord, TripWithResponses } from '@/lib/trip-types'
@@ -125,6 +124,30 @@ function getBestWindow(
   return best
 }
 
+// Generate initials avatar color from name
+function getAvatarColor(name: string) {
+  const colors = [
+    'bg-primary/20 text-primary',
+    'bg-accent/20 text-accent',
+    'bg-emerald-500/20 text-emerald-700',
+    'bg-amber-500/20 text-amber-700',
+    'bg-rose-500/20 text-rose-700',
+    'bg-sky-500/20 text-sky-700',
+  ]
+  let hash = 0
+  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash)
+  return colors[Math.abs(hash) % colors.length]
+}
+
+function getInitials(name: string) {
+  return name
+    .split(' ')
+    .map((p) => p[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2)
+}
+
 export default function ResultsPage() {
   const params = useParams()
   const tripId = params.tripId as string
@@ -163,7 +186,6 @@ export default function ResultsPage() {
     if (typeof window === 'undefined') {
       return `${process.env.NEXT_PUBLIC_BASE_URL || 'https://outthegc.app'}/results/${tripId}`
     }
-
     return `${window.location.origin}/results/${tripId}`
   }, [tripId])
 
@@ -243,9 +265,9 @@ export default function ResultsPage() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background">
-        <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
-          <div className="rounded-2xl border border-border/60 bg-card p-10 text-center shadow-sm">
-            <h1 className="mb-2 text-2xl font-semibold text-foreground">Loading results...</h1>
+        <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 lg:px-8">
+          <div className="rounded-2xl border border-border bg-card p-10 text-center shadow-sm">
+            <h1 className="mb-2 text-2xl font-bold text-foreground">Loading results...</h1>
             <p className="text-sm text-muted-foreground">Pulling together the group picture.</p>
           </div>
         </div>
@@ -256,15 +278,19 @@ export default function ResultsPage() {
   if (loadError || !trip) {
     return (
       <div className="min-h-screen bg-background">
-        <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
-          <div className="rounded-2xl border border-border/60 bg-card p-10 text-center shadow-sm">
-            <h1 className="mb-2 text-2xl font-semibold text-foreground">Results not found</h1>
+        <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 lg:px-8">
+          <div className="rounded-2xl border border-border bg-card p-10 text-center shadow-sm">
+            <h1 className="mb-2 text-2xl font-bold text-foreground">Results not found</h1>
             <p className="text-sm text-muted-foreground">{loadError || 'This results page does not exist.'}</p>
           </div>
         </div>
       </div>
     )
   }
+
+  const bestDateLabel = bestWindow
+    ? `${bestWindow.start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${bestWindow.end.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+    : null
 
   return (
     <div className="min-h-screen bg-background">
@@ -278,188 +304,220 @@ export default function ResultsPage() {
           activeTab="results"
         />
 
-        <Card className="border-border/60 bg-card shadow-sm">
-          <CardContent className="grid gap-4 p-6 md:grid-cols-3">
-            <div className="rounded-xl border border-border/60 bg-muted/20 p-4">
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Top destination</p>
-              <p className="mt-2 text-xl font-semibold text-foreground">
-                {sortedDestinations[0]?.[0] || 'Still deciding'}
-              </p>
-            </div>
-            <div className="rounded-xl border border-border/60 bg-muted/20 p-4">
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Best dates</p>
-              <p className="mt-2 text-xl font-semibold text-foreground">
-                {bestWindow
-                  ? `${bestWindow.start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${bestWindow.end.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
-                  : 'Waiting on more responses'}
-              </p>
-              <p className="mt-1 text-xs text-muted-foreground">For a {tripDurationDays}-day trip</p>
-            </div>
-            <div className="rounded-xl border border-border/60 bg-muted/20 p-4">
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Group size</p>
-              <p className="mt-2 text-xl font-semibold text-foreground">
-                {participants.length} {participants.length === 1 ? 'response' : 'responses'}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+        {/* Hero stats — 3 big numbers */}
+        <div className="grid gap-4 sm:grid-cols-3">
+          {/* Best Dates — primary featured stat */}
+          <div className="sm:col-span-1 rounded-2xl border border-primary/20 bg-primary/8 p-5 flex flex-col gap-1.5">
+            <p className="text-xs font-semibold uppercase tracking-wide text-primary">Best dates</p>
+            <p className="text-2xl font-bold text-foreground leading-tight">
+              {bestDateLabel ?? '—'}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {bestWindow
+                ? `${Math.round(bestWindow.average)}/${participants.length} people free · ${tripDurationDays}-day trip`
+                : 'Waiting on more responses'}
+            </p>
+          </div>
+          {/* Top destination */}
+          <div className="rounded-2xl border border-border bg-card p-5 flex flex-col gap-1.5">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Top destination</p>
+            <p className="text-2xl font-bold text-foreground leading-tight">
+              {sortedDestinations[0]?.[0] ?? '—'}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {sortedDestinations[0]?.[1] != null
+                ? `${sortedDestinations[0][1]} of ${participants.length} votes`
+                : 'No picks yet'}
+            </p>
+          </div>
+          {/* Group size */}
+          <div className="rounded-2xl border border-border bg-card p-5 flex flex-col gap-1.5">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Responses in</p>
+            <p className="text-2xl font-bold text-foreground leading-tight">{participants.length}</p>
+            <p className="text-xs text-muted-foreground">
+              {participants.length === 0
+                ? 'No one yet'
+                : participants.length === 1
+                  ? '1 person responded'
+                  : `${participants.length} people responded`}
+            </p>
+          </div>
+        </div>
 
-        <Card className="border-border/60 bg-card shadow-sm">
-          <CardHeader className="pb-3.5">
-            <CardTitle className="flex items-center gap-2 text-sm font-semibold text-foreground">
-              <Calendar className="size-4 text-primary" />
-              Trip length
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div className="flex flex-col gap-4">
+        {/* Trip length slider */}
+        <div className="rounded-2xl border border-border bg-card p-5">
+          <div className="flex items-baseline gap-2 mb-3">
+            <Calendar className="size-4 text-primary shrink-0 mt-0.5" />
+            <div className="flex-1">
               <div className="flex items-baseline gap-2">
-                <span className="text-3xl font-bold text-primary">{tripDurationDays}</span>
-                <span className="text-xs font-medium text-muted-foreground">day{tripDurationDays === 1 ? '' : 's'}</span>
+                <p className="text-sm font-semibold text-foreground">Trip length</p>
+                <span className="text-2xl font-bold text-primary">{tripDurationDays}</span>
+                <span className="text-xs text-muted-foreground">day{tripDurationDays === 1 ? '' : 's'}</span>
               </div>
-              <p className="text-xs text-muted-foreground">
-                Adjust the trip length to see how the best date recommendation changes, from a quick weekend to a longer getaway.
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Drag to adjust — the best date window updates above.
               </p>
-              <Slider
-                value={[tripDurationDays]}
-                onValueChange={(value) => setTripDurationDays(value[0])}
-                min={1}
-                max={maxTripDuration}
-                step={1}
-                className="[&_[role=slider]]:bg-primary [&_[role=slider]]:border-2 [&_[role=slider]]:border-primary-foreground"
-              />
-              <div className="flex justify-between text-xs font-medium text-muted-foreground">
-                <span>1 day</span>
-                <span>{maxTripDuration} days</span>
-              </div>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+          <Slider
+            value={[tripDurationDays]}
+            onValueChange={(value) => setTripDurationDays(value[0])}
+            min={1}
+            max={maxTripDuration}
+            step={1}
+            className="[&_[role=slider]]:bg-primary [&_[role=slider]]:border-2 [&_[role=slider]]:border-primary-foreground"
+          />
+          <div className="flex justify-between text-xs text-muted-foreground mt-2">
+            <span>1 day</span>
+            <span>{maxTripDuration} days</span>
+          </div>
+        </div>
 
+        {/* Availability heatmap */}
         <AvailabilityHeatmap
           participants={participants}
           tripDateRange={{ from: new Date(trip.startDate), to: new Date(trip.endDate) }}
           tripDurationDays={tripDurationDays}
         />
 
-        <div className="grid gap-6 lg:grid-cols-3">
-          <Card className="border-border/60 bg-card shadow-sm">
-            <CardHeader className="pb-3.5">
-              <CardTitle className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                <MapPin className="size-4 text-primary" />
-                Destination votes
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="pt-0">
-              {sortedDestinations.length === 0 ? (
-                <p className="text-xs text-muted-foreground">No destination picks yet.</p>
-              ) : (
-                <div className="flex flex-col gap-3">
-                  {sortedDestinations.map(([destination, count]) => (
-                    <div key={destination} className="flex flex-col gap-1.5">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold text-foreground">{destination}</span>
-                        <span className="text-xs font-medium text-primary">{count} vote{count === 1 ? '' : 's'}</span>
-                      </div>
-                      <Progress value={(count / participants.length) * 100} className="h-2 rounded-full" />
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card className="border-border/60 bg-card shadow-sm">
-            <CardHeader className="pb-3.5">
-              <CardTitle className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                <DollarSign className="size-4 text-primary" />
-                Budget breakdown
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="pt-0">
-              {Object.keys(budgetCounts).length === 0 ? (
-                <p className="text-xs text-muted-foreground">No budget responses yet.</p>
-              ) : (
-                <div className="flex flex-wrap gap-2">
-                  {Object.entries(budgetCounts).map(([budget, count]) => (
-                    <Badge key={budget} variant="secondary" className="text-xs font-medium">
-                      {BUDGET_LABELS[budget] || budget} · {count}
-                    </Badge>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card className="border-border/60 bg-card shadow-sm">
-            <CardHeader className="pb-3.5">
-              <CardTitle className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                <Heart className="size-4 text-primary" />
-                Group vibe
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="pt-0">
-              {sortedInterests.length === 0 ? (
-                <p className="text-xs text-muted-foreground">No activity preferences yet.</p>
-              ) : (
-                <div className="flex flex-wrap gap-2">
-                  {sortedInterests.map(([interest, count]) => (
-                    <Badge key={interest} variant="outline" className="gap-1.5 text-xs font-medium bg-primary/5 text-primary border-primary/20">
-                      {INTEREST_LABELS[interest] || interest}
-                      <span className="font-semibold">{count}</span>
-                    </Badge>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-
-        <Card className="border-border/60 bg-card shadow-sm">
-          <CardHeader className="pb-3.5">
-            <CardTitle className="flex items-center gap-2 text-sm font-semibold text-foreground">
-              <MessageSquare className="size-4 text-primary" />
-              Participant notes
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0">
-            {participantNotes.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No extra notes yet.</p>
+        {/* Destination votes + budget + vibe — editorial 3-col */}
+        <div className="grid gap-5 lg:grid-cols-3">
+          {/* Destinations — wider primary section */}
+          <div className="lg:col-span-1 rounded-2xl border border-border bg-card p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <MapPin className="size-4 text-primary shrink-0" />
+              <p className="text-sm font-semibold text-foreground">Destination votes</p>
+            </div>
+            {sortedDestinations.length === 0 ? (
+              <p className="text-xs text-muted-foreground">No picks yet.</p>
             ) : (
-              <div className="grid gap-4 md:grid-cols-2">
-                {participantNotes.map((participant) => (
-                  <div key={participant.id} className="rounded-xl border border-border/60 bg-muted/20 p-4">
-                    <div className="mb-2 flex items-center justify-between gap-3">
-                      <p className="text-sm font-semibold text-foreground">{participant.name}</p>
-                      <Badge variant="outline" className="text-xs font-medium">
-                        {participant.submittedAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                      </Badge>
+              <div className="flex flex-col gap-3">
+                {sortedDestinations.map(([destination, count], index) => (
+                  <div key={destination} className="flex flex-col gap-1.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-sm font-medium text-foreground flex items-center gap-1.5">
+                        {index === 0 && (
+                          <span className="w-1.5 h-1.5 rounded-full bg-primary inline-block shrink-0" />
+                        )}
+                        {destination}
+                      </span>
+                      <span className="text-xs font-semibold text-primary shrink-0">
+                        {count}/{participants.length}
+                      </span>
                     </div>
-                    <p className="text-sm leading-relaxed text-muted-foreground">{participant.notes}</p>
+                    <Progress
+                      value={(count / Math.max(1, participants.length)) * 100}
+                      className="h-1.5 rounded-full"
+                    />
                   </div>
                 ))}
               </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
 
-        <Card className="border-border/60 bg-card shadow-sm">
-          <CardHeader className="pb-3.5">
-            <CardTitle className="flex items-center gap-2 text-sm font-semibold text-foreground">
-              <Users className="size-4 text-primary" />
-              Who responded
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div className="flex flex-wrap gap-2">
-              {participants.map((participant) => (
-                <Badge key={participant.id} variant="secondary" className="text-xs font-medium">
-                  {participant.name}
-                </Badge>
+          {/* Budget */}
+          <div className="rounded-2xl border border-border bg-card p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <DollarSign className="size-4 text-primary shrink-0" />
+              <p className="text-sm font-semibold text-foreground">Budget breakdown</p>
+            </div>
+            {Object.keys(budgetCounts).length === 0 ? (
+              <p className="text-xs text-muted-foreground">No budget responses yet.</p>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {Object.entries(budgetCounts)
+                  .sort(([, a], [, b]) => b - a)
+                  .map(([budget, count]) => (
+                    <div key={budget} className="flex items-center justify-between">
+                      <span className="text-sm text-foreground">{BUDGET_LABELS[budget] || budget}</span>
+                      <span className="text-xs font-semibold text-muted-foreground">
+                        {count} {count === 1 ? 'person' : 'people'}
+                      </span>
+                    </div>
+                  ))}
+              </div>
+            )}
+          </div>
+
+          {/* Vibe */}
+          <div className="rounded-2xl border border-border bg-card p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <Heart className="size-4 text-primary shrink-0" />
+              <p className="text-sm font-semibold text-foreground">Group vibe</p>
+            </div>
+            {sortedInterests.length === 0 ? (
+              <p className="text-xs text-muted-foreground">No activity preferences yet.</p>
+            ) : (
+              <div className="flex flex-wrap gap-1.5">
+                {sortedInterests.map(([interest, count]) => (
+                  <Badge
+                    key={interest}
+                    variant="outline"
+                    className="gap-1 text-xs font-medium bg-primary/6 text-primary border-primary/20 hover:bg-primary/12 transition-colors duration-150"
+                  >
+                    {INTEREST_LABELS[interest] || interest}
+                    <span className="font-bold">{count}</span>
+                  </Badge>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Participant notes */}
+        {participantNotes.length > 0 && (
+          <div className="rounded-2xl border border-border bg-card p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <MessageSquare className="size-4 text-primary shrink-0" />
+              <p className="text-sm font-semibold text-foreground">Notes from the group</p>
+            </div>
+            <div className="grid gap-3 md:grid-cols-2">
+              {participantNotes.map((participant) => (
+                <div
+                  key={participant.id}
+                  className="rounded-xl border border-border/60 bg-muted/30 p-4 transition-shadow duration-150 hover:shadow-sm"
+                >
+                  <div className="mb-2 flex items-center gap-2">
+                    <div
+                      className={`size-7 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${getAvatarColor(participant.name)}`}
+                    >
+                      {getInitials(participant.name)}
+                    </div>
+                    <p className="text-sm font-semibold text-foreground">{participant.name}</p>
+                  </div>
+                  <p className="text-sm leading-relaxed text-muted-foreground">{participant.notes}</p>
+                </div>
               ))}
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        )}
+
+        {/* Who responded */}
+        <div className="rounded-2xl border border-border bg-card p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <Users className="size-4 text-primary shrink-0" />
+            <p className="text-sm font-semibold text-foreground">
+              Who responded
+              <span className="ml-2 text-xs font-normal text-muted-foreground">({participants.length})</span>
+            </p>
+          </div>
+          {participants.length === 0 ? (
+            <p className="text-xs text-muted-foreground">No responses yet.</p>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {participants.map((participant) => (
+                <div key={participant.id} className="flex items-center gap-2 rounded-full border border-border bg-muted/30 pl-1 pr-3 py-1">
+                  <div
+                    className={`size-6 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${getAvatarColor(participant.name)}`}
+                  >
+                    {getInitials(participant.name)}
+                  </div>
+                  <span className="text-xs font-medium text-foreground">{participant.name}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )
