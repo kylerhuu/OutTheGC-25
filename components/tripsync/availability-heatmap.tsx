@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Calendar } from 'lucide-react'
 import type { ParticipantData } from '@/app/event/[tripId]/page'
@@ -33,6 +34,7 @@ interface MonthSection {
 
 export function AvailabilityHeatmap({ participants, tripDateRange, tripDurationDays }: AvailabilityHeatmapProps) {
   const [activeWindowKey, setActiveWindowKey] = useState<string | null>(null)
+  const [showCalendar, setShowCalendar] = useState(false)
 
   // Generate all days in the trip date range with availability counts
   const heatmapData = useMemo(() => {
@@ -233,11 +235,12 @@ export function AvailabilityHeatmap({ participants, tripDateRange, tripDurationD
                     }`}
                     onMouseEnter={() => setActiveWindowKey(getWindowKey(window))}
                     onMouseLeave={() => setActiveWindowKey(null)}
-                    onClick={() =>
+                    onClick={() => {
+                      setShowCalendar(true)
                       setActiveWindowKey((current) =>
                         current === getWindowKey(window) ? null : getWindowKey(window),
                       )
-                    }
+                    }}
                   >
                     <div>
                       <p className="text-sm font-medium text-foreground">
@@ -255,70 +258,92 @@ export function AvailabilityHeatmap({ participants, tripDateRange, tripDurationD
             </div>
           )}
 
-          <div className="grid gap-4 xl:grid-cols-2">
-            {monthSections.map((section) => (
-              <div key={section.key} className="rounded-xl border border-border/50 bg-background p-3">
-                <div className="mb-3 flex items-center justify-between">
-                  <p className="text-sm font-semibold text-foreground">{section.label}</p>
-                  <p className="text-[11px] text-muted-foreground">
-                    {participants.length} traveler{participants.length === 1 ? '' : 's'}
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-7 gap-1">
-                  {dayLabels.map((label, index) => (
-                    <div key={`${section.key}-${label}-${index}`} className="text-center text-[11px] font-medium text-muted-foreground">
-                      {label}
-                    </div>
-                  ))}
-                </div>
-
-                <div className="mt-2 flex flex-col gap-1">
-                  {section.weeks.map((week, weekIndex) => (
-                    <div key={`${section.key}-week-${weekIndex}`} className="grid grid-cols-7 gap-1">
-                      {week.map((day, dayIndex) => {
-                        if (day.count === -1) {
-                          return <div key={`${section.key}-empty-${weekIndex}-${dayIndex}`} className="aspect-square rounded-sm" />
-                        }
-
-                        const isHighlighted =
-                          activeWindow &&
-                          day.date >= activeWindow.start &&
-                          day.date <= activeWindow.end
-
-                        return (
-                          <div
-                            key={`${section.key}-${day.date.toISOString()}`}
-                            className={`relative flex aspect-square min-h-9 items-center justify-center rounded-md border text-[11px] font-medium transition-all ${
-                              isHighlighted ? 'border-primary ring-2 ring-primary/20' : 'border-transparent'
-                            } ${getIntensityClass(day.percentage, hasUniformAvailability)} ${
-                              day.percentage >= 75 && !hasUniformAvailability ? 'text-primary-foreground' : 'text-foreground/80'
-                            }`}
-                            title={`${day.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}: ${day.count}/${day.total} available`}
-                          >
-                            {day.date.getDate()}
-                          </div>
-                        )
-                      })}
-                    </div>
-                  ))}
-                </div>
+          <div className="rounded-xl border border-border/50 bg-muted/20 p-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-semibold text-foreground">Monthly availability</p>
+                <p className="text-xs text-muted-foreground">
+                  Keep the full calendar tucked away unless you need the detailed month-by-month view.
+                </p>
               </div>
-            ))}
+              <Button
+                type="button"
+                size="sm"
+                variant={showCalendar ? 'outline' : 'default'}
+                onClick={() => setShowCalendar((current) => !current)}
+              >
+                {showCalendar ? 'Hide monthly availability' : 'Show monthly availability'}
+              </Button>
+            </div>
           </div>
 
-          {/* Legend */}
-          <div className="flex items-center justify-between pt-2 border-t border-border/40">
-            <span className="text-xs text-muted-foreground">Less</span>
-            <div className="flex items-center gap-1">
-              <div className="size-3 rounded-sm bg-muted/30" />
-              <div className="size-3 rounded-sm bg-primary/20" />
-              <div className="size-3 rounded-sm bg-primary/40" />
-              <div className="size-3 rounded-sm bg-primary/60" />
-              <div className="size-3 rounded-sm bg-primary/90" />
-            </div>
-            <span className="text-xs text-muted-foreground">More</span>
-          </div>
+          {showCalendar && (
+            <>
+              <div className="grid gap-4 xl:grid-cols-2">
+                {monthSections.map((section) => (
+                  <div key={section.key} className="rounded-xl border border-border/50 bg-background p-3">
+                    <div className="mb-3 flex items-center justify-between">
+                      <p className="text-sm font-semibold text-foreground">{section.label}</p>
+                      <p className="text-[11px] text-muted-foreground">
+                        {participants.length} traveler{participants.length === 1 ? '' : 's'}
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-7 gap-1">
+                      {dayLabels.map((label, index) => (
+                        <div key={`${section.key}-${label}-${index}`} className="text-center text-[11px] font-medium text-muted-foreground">
+                          {label}
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="mt-2 flex flex-col gap-1">
+                      {section.weeks.map((week, weekIndex) => (
+                        <div key={`${section.key}-week-${weekIndex}`} className="grid grid-cols-7 gap-1">
+                          {week.map((day, dayIndex) => {
+                            if (day.count === -1) {
+                              return <div key={`${section.key}-empty-${weekIndex}-${dayIndex}`} className="aspect-square rounded-sm" />
+                            }
+
+                            const isHighlighted =
+                              activeWindow &&
+                              day.date >= activeWindow.start &&
+                              day.date <= activeWindow.end
+
+                            return (
+                              <div
+                                key={`${section.key}-${day.date.toISOString()}`}
+                                className={`relative flex aspect-square min-h-9 items-center justify-center rounded-md border text-[11px] font-medium transition-all ${
+                                  isHighlighted ? 'border-primary ring-2 ring-primary/20' : 'border-transparent'
+                                } ${getIntensityClass(day.percentage, hasUniformAvailability)} ${
+                                  day.percentage >= 75 && !hasUniformAvailability ? 'text-primary-foreground' : 'text-foreground/80'
+                                }`}
+                                title={`${day.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}: ${day.count}/${day.total} available`}
+                              >
+                                {day.date.getDate()}
+                              </div>
+                            )
+                          })}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex items-center justify-between border-t border-border/40 pt-2">
+                <span className="text-xs text-muted-foreground">Less</span>
+                <div className="flex items-center gap-1">
+                  <div className="size-3 rounded-sm bg-muted/30" />
+                  <div className="size-3 rounded-sm bg-primary/20" />
+                  <div className="size-3 rounded-sm bg-primary/40" />
+                  <div className="size-3 rounded-sm bg-primary/60" />
+                  <div className="size-3 rounded-sm bg-primary/90" />
+                </div>
+                <span className="text-xs text-muted-foreground">More</span>
+              </div>
+            </>
+          )}
         </div>
       </CardContent>
     </Card>
