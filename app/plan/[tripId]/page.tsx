@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { CalendarDays, CheckSquare, Loader2, MapPinned, NotebookPen, PlaneTakeoff } from 'lucide-react'
 import { EventTopBar } from '@/components/tripsync/event-top-bar'
+import { TripSnapshot } from '@/components/tripsync/trip-snapshot'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -341,6 +342,9 @@ export default function PlanPage() {
           shareUrl={shareUrl}
           activeTab="plan"
         />
+
+        {/* Featured Trip Snapshot */}
+        <TripSnapshot trip={data.trip} plan={data.plan} />
 
         <Card className="border-border/60 bg-card shadow-sm">
           <CardHeader className="pb-4">

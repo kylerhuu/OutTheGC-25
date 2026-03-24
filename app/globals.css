@@ -139,12 +139,46 @@
 }
 
 @layer utilities {
-  /* Subtle hover lift for interactive cards */
+  /* Premium shadow system */
+  .shadow-base {
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+  }
+  .shadow-soft {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  }
+  .shadow-featured {
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(0, 0, 0, 0.02);
+  }
+
+  /* Glow effects for emphasis */
+  .glow-primary {
+    box-shadow: 0 0 20px rgba(84, 145, 201, 0.25), 0 10px 30px rgba(0, 0, 0, 0.08);
+  }
+  .glow-accent {
+    box-shadow: 0 0 20px rgba(132, 94, 194, 0.25), 0 10px 30px rgba(0, 0, 0, 0.08);
+  }
+
+  /* Interactive hover lift */
   .hover-lift {
     @apply transition-all duration-150 ease-out;
   }
   .hover-lift:hover {
-    @apply -translate-y-px shadow-md;
+    @apply -translate-y-1 shadow-base;
+  }
+
+  /* Featured card elevation */
+  .featured-card {
+    @apply relative transition-all duration-150 ease-out;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(0, 0, 0, 0.02);
+  }
+  .featured-card::before {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    background: radial-gradient(600px at 50% 0%, rgba(84, 145, 201, 0.15), transparent 70%);
+    pointer-events: none;
+    z-index: -1;
   }
 
   /* Teal primary tint background */
@@ -154,5 +188,34 @@
   /* Violet accent tint background */
   .bg-accent-tint {
     background-color: oklch(from var(--color-accent) l c h / 0.08);
+  }
+
+  /* Floating animation */
+  @keyframes float {
+    0%, 100% {
+      transform: translateY(0px);
+    }
+    50% {
+      transform: translateY(-8px);
+    }
+  }
+  .animate-float {
+    animation: float 3s ease-in-out infinite;
+  }
+  .animate-float-slow {
+    animation: float 4s ease-in-out infinite;
+  }
+
+  /* Pulse highlight for best options */
+  @keyframes pulse-glow {
+    0%, 100% {
+      box-shadow: 0 0 0 0 rgba(84, 145, 201, 0.4);
+    }
+    50% {
+      box-shadow: 0 0 0 10px rgba(84, 145, 201, 0);
+    }
+  }
+  .pulse-glow {
+    animation: pulse-glow 2s infinite;
   }
 }

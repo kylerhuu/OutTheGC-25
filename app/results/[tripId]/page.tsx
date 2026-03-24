@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { Calendar, DollarSign, Heart, MapPin, MessageSquare, Users } from 'lucide-react'
 import { EventTopBar } from '@/components/tripsync/event-top-bar'
+import { BestTripOption } from '@/components/tripsync/best-trip-option'
 import { AvailabilityHeatmap } from '@/components/tripsync/availability-heatmap'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
@@ -303,6 +304,15 @@ export default function ResultsPage() {
           shareUrl={shareUrl}
           activeTab="results"
         />
+
+        {/* Featured section: Best Trip Option */}
+        {bestWindow && sortedDestinations.length > 0 && (
+          <BestTripOption
+            bestDates={bestDateLabel || '—'}
+            peopleCount={Math.round(bestWindow.average)}
+            topDestinations={sortedDestinations.map(([dest]) => dest)}
+          />
+        )}
 
         {/* Hero stats — 3 big numbers */}
         <div className="grid gap-4 sm:grid-cols-3">
