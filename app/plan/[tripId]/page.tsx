@@ -344,7 +344,9 @@ export default function PlanPage() {
         <Card className="border-border/60 bg-card shadow-sm">
           <CardHeader className="pb-4">
             <CardTitle className="text-xl font-semibold text-foreground">Trip plan</CardTitle>
-            <CardDescription>Lock in the plan and keep the final details in one simple place.</CardDescription>
+            <CardDescription>
+              Use this page to organize ideas, rough plans, and reminders once the group is aligned. It&apos;s here to keep everyone on the same page, not to replace full booking tools.
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="grid gap-4 md:grid-cols-2">

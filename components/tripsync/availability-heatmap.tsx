@@ -8,6 +8,7 @@ import type { ParticipantData } from '@/app/event/[tripId]/page'
 interface AvailabilityHeatmapProps {
   participants: ParticipantData[]
   tripDateRange: { from: Date; to: Date }
+  tripDurationDays?: number
 }
 
 interface DayData {
@@ -17,7 +18,7 @@ interface DayData {
   percentage: number
 }
 
-export function AvailabilityHeatmap({ participants, tripDateRange }: AvailabilityHeatmapProps) {
+export function AvailabilityHeatmap({ participants, tripDateRange, tripDurationDays }: AvailabilityHeatmapProps) {
   // Generate all days in the trip date range with availability counts
   const heatmapData = useMemo(() => {
     const days: DayData[] = []
@@ -94,7 +95,22 @@ export function AvailabilityHeatmap({ participants, tripDateRange }: Availabilit
   }
 
   const dayLabels = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
-  const suggestedDuration = Math.min(4, Math.max(1, heatmapData.length))
+  const suggestedDuration = Math.min(tripDurationDays ?? 4, Math.max(1, heatmapData.length))
+  const monthMarkers = useMemo(() => {
+    const markers: Array<{ index: number; label: string }> = []
+
+    heatmapData.forEach((day, index) => {
+      const previous = heatmapData[index - 1]
+      if (!previous || previous.date.getMonth() !== day.date.getMonth()) {
+        markers.push({
+          index,
+          label: day.date.toLocaleDateString('en-US', { month: 'short' }),
+        })
+      }
+    })
+
+    return markers
+  }, [heatmapData])
 
   const bestWindows = useMemo(() => {
     if (participants.length === 0 || heatmapData.length === 0 || suggestedDuration > heatmapData.length) {
@@ -201,18 +217,28 @@ export function AvailabilityHeatmap({ participants, tripDateRange }: Availabilit
             ))}
           </div>
 
+          {monthMarkers.length > 0 && (
+            <div className="flex flex-wrap gap-2 text-xs font-medium text-muted-foreground">
+              {monthMarkers.map((marker) => (
+                <span key={`${marker.label}-${marker.index}`} className="rounded-full bg-muted px-2 py-1">
+                  {marker.label}
+                </span>
+              ))}
+            </div>
+          )}
+
           {/* Heatmap grid */}
           <div className="flex flex-col gap-1">
             {weeks.map((week, weekIndex) => (
               <div key={weekIndex} className="grid grid-cols-7 gap-1">
                 {week.map((day, dayIndex) => {
                   if (day.count === -1) {
-                    return <div key={dayIndex} className="aspect-square rounded-sm" />
+                    return <div key={dayIndex} className="aspect-square max-h-9 rounded-sm" />
                   }
                   return (
                     <div
                       key={dayIndex}
-                      className={`aspect-square rounded-sm flex items-center justify-center text-xs font-medium transition-colors cursor-default ${getIntensityClass(day.percentage)} ${day.percentage >= 75 ? 'text-primary-foreground' : 'text-foreground/70'}`}
+                      className={`aspect-square max-h-9 rounded-sm flex items-center justify-center text-[11px] font-medium transition-colors cursor-default ${getIntensityClass(day.percentage)} ${day.percentage >= 75 ? 'text-primary-foreground' : 'text-foreground/70'}`}
                       title={`${day.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}: ${day.count}/${day.total} available`}
                     >
                       {day.date.getDate()}

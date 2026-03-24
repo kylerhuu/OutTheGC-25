@@ -8,6 +8,7 @@ import { AvailabilityHeatmap } from '@/components/tripsync/availability-heatmap'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
+import { Slider } from '@/components/ui/slider'
 import type { PublicResponseRecord, TripWithResponses } from '@/lib/trip-types'
 
 interface ParticipantData {
@@ -76,14 +77,14 @@ function formatDateRange(from: Date, to: Date) {
   return `${from.toLocaleDateString('en-US', options)} - ${to.toLocaleDateString('en-US', options)}`
 }
 
-function getBestWindow(participants: ParticipantData[], tripDateRange: { from: Date; to: Date }) {
+function getBestWindow(
+  participants: ParticipantData[],
+  tripDateRange: { from: Date; to: Date },
+  duration: number,
+) {
   const days: Array<{ date: Date; count: number }> = []
   const currentDate = new Date(tripDateRange.from)
   const endDate = new Date(tripDateRange.to)
-  const duration = Math.min(
-    4,
-    Math.max(1, Math.floor((endDate.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24)) + 1),
-  )
 
   while (currentDate <= endDate) {
     const dayStart = new Date(currentDate)
@@ -131,6 +132,7 @@ export default function ResultsPage() {
   const [participants, setParticipants] = useState<ParticipantData[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [tripDurationDays, setTripDurationDays] = useState(4)
 
   const loadTrip = useCallback(async () => {
     setIsLoading(true)
@@ -218,8 +220,25 @@ export default function ResultsPage() {
     return getBestWindow(participants, {
       from: new Date(trip.startDate),
       to: new Date(trip.endDate),
-    })
-  }, [participants, trip])
+    }, tripDurationDays)
+  }, [participants, trip, tripDurationDays])
+
+  const maxTripDuration = useMemo(() => {
+    if (!trip) return 30
+    return Math.min(
+      30,
+      Math.max(
+        1,
+        Math.floor(
+          (new Date(trip.endDate).getTime() - new Date(trip.startDate).getTime()) / (1000 * 60 * 60 * 24),
+        ) + 1,
+      ),
+    )
+  }, [trip])
+
+  useEffect(() => {
+    setTripDurationDays((current) => Math.min(current, maxTripDuration))
+  }, [maxTripDuration])
 
   if (isLoading) {
     return (
@@ -274,6 +293,7 @@ export default function ResultsPage() {
                   ? `${bestWindow.start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${bestWindow.end.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
                   : 'Waiting on more responses'}
               </p>
+              <p className="mt-1 text-xs text-muted-foreground">For a {tripDurationDays}-day trip</p>
             </div>
             <div className="rounded-xl border border-border/60 bg-muted/20 p-4">
               <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Group size</p>
@@ -284,9 +304,42 @@ export default function ResultsPage() {
           </CardContent>
         </Card>
 
+        <Card className="border-border/60 bg-card shadow-sm">
+          <CardHeader className="pb-3.5">
+            <CardTitle className="flex items-center gap-2 text-sm font-semibold text-foreground">
+              <Calendar className="size-4 text-primary" />
+              Trip length
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <div className="flex flex-col gap-4">
+              <div className="flex items-baseline gap-2">
+                <span className="text-3xl font-bold text-primary">{tripDurationDays}</span>
+                <span className="text-xs font-medium text-muted-foreground">day{tripDurationDays === 1 ? '' : 's'}</span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Adjust the trip length to see how the best date recommendation changes, from a quick weekend to a longer getaway.
+              </p>
+              <Slider
+                value={[tripDurationDays]}
+                onValueChange={(value) => setTripDurationDays(value[0])}
+                min={1}
+                max={maxTripDuration}
+                step={1}
+                className="[&_[role=slider]]:bg-primary [&_[role=slider]]:border-2 [&_[role=slider]]:border-primary-foreground"
+              />
+              <div className="flex justify-between text-xs font-medium text-muted-foreground">
+                <span>1 day</span>
+                <span>{maxTripDuration} days</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         <AvailabilityHeatmap
           participants={participants}
           tripDateRange={{ from: new Date(trip.startDate), to: new Date(trip.endDate) }}
+          tripDurationDays={tripDurationDays}
         />
 
         <div className="grid gap-6 lg:grid-cols-3">
