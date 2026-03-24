@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { CalendarDays, CheckSquare, Loader2, MapPinned, NotebookPen, PlaneTakeoff } from 'lucide-react'
 import { EventTopBar } from '@/components/tripsync/event-top-bar'
+import { TripIdeasTab } from '@/components/tripsync/trip-ideas-tab'
 import { TripSnapshot } from '@/components/tripsync/trip-snapshot'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -78,6 +79,7 @@ export default function PlanPage() {
   const [todoError, setTodoError] = useState<string | null>(null)
   const [isAddingTodo, setIsAddingTodo] = useState(false)
   const [busyTodoId, setBusyTodoId] = useState<string | null>(null)
+  const [activePlannerTab, setActivePlannerTab] = useState<'ideas' | 'plan'>('plan')
 
   const loadPlan = useCallback(async () => {
     setIsLoading(true)
@@ -346,6 +348,26 @@ export default function PlanPage() {
         {/* Featured Trip Snapshot */}
         <TripSnapshot trip={data.trip} plan={data.plan} />
 
+        <div className="inline-flex w-fit items-center rounded-2xl border border-border bg-muted/40 p-1 shadow-sm">
+          {(['ideas', 'plan'] as const).map((tab) => (
+            <button
+              key={tab}
+              type="button"
+              onClick={() => setActivePlannerTab(tab)}
+              className={`rounded-xl px-4 py-2 text-sm font-medium transition-colors ${
+                activePlannerTab === tab
+                  ? 'bg-primary text-primary-foreground shadow-sm'
+                  : 'text-muted-foreground hover:bg-background hover:text-foreground'
+              }`}
+            >
+              {tab === 'ideas' ? 'Ideas' : 'Plan'}
+            </button>
+          ))}
+        </div>
+
+        {activePlannerTab === 'ideas' ? (
+          <TripIdeasTab />
+        ) : (
         <Card className="border-border/60 bg-card shadow-sm">
           <CardHeader className="pb-4">
             <CardTitle className="text-xl font-semibold text-foreground">Plan the trip</CardTitle>
@@ -548,6 +570,7 @@ export default function PlanPage() {
             </div>
           </CardContent>
         </Card>
+        )}
       </div>
     </div>
   )

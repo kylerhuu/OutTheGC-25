@@ -35,7 +35,7 @@ export function TripSnapshot({ trip, plan }: TripSnapshotProps) {
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">
               Trip name
             </p>
-            <h3 className="text-lg font-bold text-foreground leading-tight">{trip.tripName}</h3>
+            <h3 className="text-lg font-bold text-foreground leading-tight">{trip.name}</h3>
           </div>
 
           {/* Destination */}
