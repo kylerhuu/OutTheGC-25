@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { CheckSquare, Lightbulb, Loader2, Plus } from 'lucide-react'
+import { Lightbulb, Loader2, Plus } from 'lucide-react'
 import { toast } from '@/hooks/use-toast'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -437,7 +437,7 @@ export function TripIdeasTab({ context, onAddToPlan, onAddManyToPlan }: TripIdea
       </CardHeader>
 
       <CardContent className="space-y-6">
-        <div className="rounded-2xl border border-primary/15 bg-gradient-to-br from-primary/10 via-background to-fuchsia-500/5 p-5">
+        <div className="rounded-2xl border border-primary/15 bg-gradient-to-br from-primary/10 via-background to-fuchsia-500/5 p-4">
           <div className="flex flex-wrap gap-2">
             {QUICK_ACTIONS.map((action) => (
               <button
@@ -457,98 +457,91 @@ export function TripIdeasTab({ context, onAddToPlan, onAddManyToPlan }: TripIdea
           </p>
         </div>
 
-        <div className="rounded-3xl border border-border/60 bg-muted/20">
-          <div className="border-b border-border/60 px-5 py-4">
-            <p className="text-sm font-semibold text-foreground">Conversation</p>
-            <p className="text-xs text-muted-foreground">Trip Copilot explains what it noticed before showing a structure.</p>
-          </div>
+        <div className="grid gap-5 lg:grid-cols-[0.88fr_1.12fr]">
+          <div className="rounded-[28px] border border-border/60 bg-background shadow-sm">
+            <div className="border-b border-border/50 px-5 py-4">
+              <p className="text-sm font-semibold text-foreground">Chat</p>
+              <p className="text-xs text-muted-foreground">Talk through the mess on the left.</p>
+            </div>
 
-          <div className="max-h-[680px] space-y-4 overflow-y-auto p-5">
-            {!hasConversation && (
-              <AssistantBubble>
-                <p className="text-sm font-medium text-foreground">Start with anything messy.</p>
-                <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                  Paste a rough itinerary, hotel links, food spots, transport notes, TikToks, or just a brain dump.
-                  I&apos;ll tell you what structure makes the most sense.
+            <div className="max-h-[560px] space-y-4 overflow-y-auto bg-muted/10 p-5">
+              {!hasConversation && (
+                <AssistantBubble>
+                  <p className="text-sm font-medium text-foreground">Start with anything messy.</p>
+                  <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                    Paste a rough itinerary, hotel links, food spots, transport notes, TikToks, or just a brain dump.
+                    I&apos;ll figure out the best structure.
+                  </p>
+                </AssistantBubble>
+              )}
+
+              {turns.map((turn) =>
+                turn.role === 'user' ? (
+                  <UserBubble key={turn.id}>{turn.text}</UserBubble>
+                ) : (
+                  <AssistantTurnCard key={turn.id} turn={turn} onClarify={handleClarify} />
+                ),
+              )}
+
+              {isSending && (
+                <AssistantBubble>
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="size-4 animate-spin" />
+                    Trip Copilot is thinking...
+                  </div>
+                </AssistantBubble>
+              )}
+            </div>
+
+            <div className="border-t border-border/50 p-4">
+              <Textarea
+                value={composer}
+                onChange={(event) => setComposer(event.target.value)}
+                placeholder={`Paste anything here...\n- hotel links\n- places to visit\n- TikTok ideas\n- random notes\n- or a rough itinerary`}
+                className="min-h-[180px] resize-none border-border/60 bg-background/90"
+              />
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                <p className="text-[11px] text-muted-foreground">
+                  Tip: say what you want, like “clean this up,” “group this by area,” or “turn this into a final trip plan.”
                 </p>
-              </AssistantBubble>
-            )}
-
-            {turns.map((turn) =>
-              turn.role === 'user' ? (
-                <UserBubble key={turn.id}>{turn.text}</UserBubble>
-              ) : (
-                <AssistantTurnCard
-                  key={turn.id}
-                  turn={turn}
-                  addedIdeaIds={addedIdeaIds}
-                  onClarify={handleClarify}
-                  onIdeaChange={handleIdeaChange}
-                  onAddIdea={handleAddSingleIdea}
-                  onAddMany={handleAddMany}
-                />
-              ),
-            )}
-
-            {isSending && (
-              <AssistantBubble>
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Loader2 className="size-4 animate-spin" />
-                  Trip Copilot is thinking...
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => void handleSend('organize', 'organize_notes')}
+                    disabled={isSending}
+                  >
+                    {isSending ? (
+                      <>
+                        <Loader2 className="size-4 animate-spin" />
+                        Sending...
+                      </>
+                    ) : (
+                      'Ask Trip Copilot'
+                    )}
+                  </Button>
+                  <Button onClick={() => void handleSend('build_itinerary', 'make_itinerary')} disabled={isSending}>
+                    {isSending ? (
+                      <>
+                        <Loader2 className="size-4 animate-spin" />
+                        Building...
+                      </>
+                    ) : (
+                      'Build a plan'
+                    )}
+                  </Button>
                 </div>
-              </AssistantBubble>
-            )}
-          </div>
-        </div>
-
-        <div className="rounded-2xl border border-border/60 bg-background p-4">
-          <Textarea
-            value={composer}
-            onChange={(event) => setComposer(event.target.value)}
-            placeholder={`Paste anything here...\n- hotel links\n- places to visit\n- TikTok ideas\n- random notes\n- or a rough itinerary`}
-            className="min-h-[180px] resize-none border-border/60 bg-background/90"
-          />
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-            <p className="text-xs text-muted-foreground">
-              Tip: if you already wrote days, say “clean this up.” If you just have a list, say “turn this into a plan.”
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                variant="outline"
-                onClick={() => void handleSend('organize', 'organize_notes')}
-                disabled={isSending}
-              >
-                {isSending ? (
-                  <>
-                    <Loader2 className="size-4 animate-spin" />
-                    Sending...
-                  </>
-                ) : (
-                  'Ask Trip Copilot'
-                )}
-              </Button>
-              <Button onClick={() => void handleSend('build_itinerary', 'make_itinerary')} disabled={isSending}>
-                {isSending ? (
-                  <>
-                    <Loader2 className="size-4 animate-spin" />
-                    Building...
-                  </>
-                ) : (
-                  'Build a plan'
-                )}
-              </Button>
+              </div>
             </div>
           </div>
-        </div>
 
-        {latestAssistantTurn && (
-          <div className="rounded-2xl border border-border/60 bg-muted/20 p-4">
-            <p className="text-sm font-semibold text-foreground">Most recent structure</p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              If you like the latest output, add the useful pieces into the saved trip plan above.
-            </p>
-          </div>
-        )}
+          <LiveDraftPanel
+            turn={latestAssistantTurn ?? null}
+            addedIdeaIds={addedIdeaIds}
+            onIdeaChange={handleIdeaChange}
+            onAddIdea={handleAddSingleIdea}
+            onAddMany={handleAddMany}
+          />
+        </div>
       </CardContent>
     </Card>
   )
@@ -556,20 +549,11 @@ export function TripIdeasTab({ context, onAddToPlan, onAddManyToPlan }: TripIdea
 
 function AssistantTurnCard({
   turn,
-  addedIdeaIds,
   onClarify,
-  onIdeaChange,
-  onAddIdea,
-  onAddMany,
 }: {
   turn: CopilotTurn
-  addedIdeaIds: string[]
   onClarify: (turn: CopilotTurn, nextIntent: CopilotIntent, label: string) => void | Promise<void>
-  onIdeaChange: (turnId: string, group: IdeaGroupKey, ideaId: string, value: string) => void
-  onAddIdea: (group: IdeaGroupKey, ideaId: string, text: string) => void | Promise<void>
-  onAddMany: (items: Array<{ group: IdeaGroupKey; ideaId: string; text: string }>) => void | Promise<void>
 }) {
-  const hasOrganizedIdeas = !!turn.organizedIdeas && Object.values(turn.organizedIdeas).some((group) => group.length > 0)
   const shouldClarify =
     turn.mode === 'build_itinerary' &&
     (turn.detectedStructure === 'mixed' || turn.detectedStructure === 'loose') &&
@@ -578,7 +562,7 @@ function AssistantTurnCard({
 
   return (
     <AssistantBubble>
-      <div className="space-y-4">
+      <div className="space-y-3">
         <div className="flex flex-wrap items-center gap-2">
           <Badge variant="secondary">Trip Copilot</Badge>
           {turn.detectedStructure && <Badge variant="outline">Detected: {formatStructureLabel(turn.detectedStructure)}</Badge>}
@@ -609,146 +593,171 @@ function AssistantTurnCard({
         )}
 
         {turn.notesSummary && (
-          <div className="rounded-2xl border border-border/60 bg-background p-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Summary</p>
-            <p className="mt-2 text-sm leading-6 text-foreground">{turn.notesSummary}</p>
-          </div>
+          <p className="text-xs leading-5 text-muted-foreground">{turn.notesSummary}</p>
         )}
+      </div>
+    </AssistantBubble>
+  )
+}
 
-        {turn.suggestedPlanSections && turn.suggestedPlanSections.length > 0 && (
-          <div className="rounded-2xl border border-border/60 bg-background p-4">
-            <p className="text-sm font-semibold text-foreground">Suggested plan shape</p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              This is the structure Trip Copilot thinks fits your notes best.
+function LiveDraftPanel({
+  turn,
+  addedIdeaIds,
+  onIdeaChange,
+  onAddIdea,
+  onAddMany,
+}: {
+  turn: CopilotTurn | null
+  addedIdeaIds: string[]
+  onIdeaChange: (turnId: string, group: IdeaGroupKey, ideaId: string, value: string) => void
+  onAddIdea: (group: IdeaGroupKey, ideaId: string, text: string) => void | Promise<void>
+  onAddMany: (items: Array<{ group: IdeaGroupKey; ideaId: string; text: string }>) => void | Promise<void>
+}) {
+  const hasOrganizedIdeas = !!turn?.organizedIdeas && Object.values(turn.organizedIdeas).some((group) => group.length > 0)
+  const previewSections =
+    turn?.suggestedPlanSections && turn.suggestedPlanSections.length > 0
+      ? turn.suggestedPlanSections
+      : turn?.preservedSections ?? []
+
+  return (
+          <div className="rounded-[28px] border border-border/60 bg-background shadow-sm">
+      <div className="border-b border-border/50 px-6 py-5">
+        <p className="text-sm font-semibold text-foreground">Current Draft</p>
+        <p className="text-xs text-muted-foreground">Live itinerary preview on the right.</p>
+      </div>
+
+      {!turn ? (
+        <div className="p-6">
+          <div className="rounded-2xl border border-dashed border-border/70 bg-muted/10 p-6">
+            <p className="text-sm font-medium text-foreground">Nothing yet.</p>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">
+              Ask Trip Copilot something on the left and the latest itinerary-style draft will appear here.
             </p>
-            <div className="mt-4 space-y-4">
-              {turn.suggestedPlanSections.map((section) => (
-                <div key={`${turn.id}-${section.title}`} className="rounded-xl border border-border/60 bg-muted/20 p-3">
-                  <p className="text-sm font-semibold text-foreground">{section.title}</p>
-                  <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
-                    {section.items.map((item) => (
-                      <li key={`${section.title}-${item}`} className="flex gap-2">
-                        <span className="mt-2 size-1 rounded-full bg-primary/70" />
-                        <span>{item}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
-            </div>
           </div>
-        )}
-
-        {turn.preservedSections && turn.preservedSections.length > 0 && (
-          <div className="rounded-2xl border border-border/60 bg-background p-4">
-            <p className="text-sm font-semibold text-foreground">Preserved outline</p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Existing structure from your notes that was kept instead of flattened.
+        </div>
+      ) : (
+        <div className="space-y-6 p-6">
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="secondary">Latest reply</Badge>
+              {turn.detectedStructure && <Badge variant="outline">{formatStructureLabel(turn.detectedStructure)}</Badge>}
+            </div>
+            <p className="text-2xl font-semibold leading-tight text-foreground">Trip draft</p>
+            <p className="text-sm leading-6 text-muted-foreground">
+              {turn.notesSummary || turn.text}
             </p>
-            <div className="mt-4 space-y-4">
-              {turn.preservedSections.map((section) => (
-                <div key={`${turn.id}-${section.title}`} className="rounded-xl border border-border/60 bg-muted/20 p-3">
-                  <p className="text-sm font-semibold text-foreground">{section.title}</p>
-                  <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
-                    {section.items.map((item) => (
-                      <li key={`${section.title}-${item}`} className="flex gap-2">
-                        <span className="mt-2 size-1 rounded-full bg-primary/70" />
-                        <span>{item}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
-            </div>
           </div>
-        )}
 
-        {hasOrganizedIdeas && turn.organizedIdeas && (
-          <div className="space-y-4">
-            <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-border/60 bg-background p-3">
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={() =>
-                  void onAddMany(
-                    (Object.keys(GROUP_LABELS) as IdeaGroupKey[]).flatMap((group) =>
-                      turn.organizedIdeas![group]
-                        .filter((item) => !addedIdeaIds.includes(item.id))
-                        .map((item) => ({ group, ideaId: item.id, text: item.text })),
-                    ),
-                  )
-                }
-              >
-                <Plus className="size-3.5" />
-                Add all to plan
-              </Button>
-            </div>
+          <div className="space-y-5 border-t border-border/50 pt-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Preview</p>
+            {previewSections.length === 0 ? (
+              <p className="text-sm text-muted-foreground">The latest reply did not include a structured draft yet.</p>
+            ) : (
+              <div className="space-y-7">
+                {previewSections.map((section) => (
+                  <section key={`${turn.id}-${section.title}`} className="space-y-2.5">
+                    <h3 className="text-lg font-semibold text-foreground">{section.title}</h3>
+                    <ul className="space-y-2 text-sm leading-6 text-muted-foreground">
+                      {section.items.map((item) => (
+                        <li key={`${section.title}-${item}`} className="flex gap-3">
+                          <span className="mt-[9px] size-1.5 rounded-full bg-primary/70" />
+                          <span>{item}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                ))}
+              </div>
+            )}
+          </div>
 
-            <div className="grid gap-4 lg:grid-cols-2">
-              {(Object.keys(GROUP_LABELS) as IdeaGroupKey[]).map((group) => (
-                <div key={`${turn.id}-${group}`} className="rounded-2xl border border-border/60 bg-background p-4">
-                  <div className="mb-3 flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm font-semibold text-foreground">{GROUP_LABELS[group]}</p>
-                      <Badge variant="outline">{turn.organizedIdeas![group].length}</Badge>
+          {hasOrganizedIdeas && turn.organizedIdeas && (
+            <div className="space-y-4 border-t border-border/50 pt-5">
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() =>
+                    void onAddMany(
+                      (Object.keys(GROUP_LABELS) as IdeaGroupKey[]).flatMap((group) =>
+                        turn.organizedIdeas![group]
+                          .filter((item) => !addedIdeaIds.includes(item.id))
+                          .map((item) => ({ group, ideaId: item.id, text: item.text })),
+                      ),
+                    )
+                  }
+                >
+                  <Plus className="size-3.5" />
+                  Add all to plan
+                </Button>
+              </div>
+
+              <div className="grid gap-4">
+                {(Object.keys(GROUP_LABELS) as IdeaGroupKey[]).map((group) => (
+                  <div key={`${turn.id}-${group}`} className="rounded-2xl border border-border/60 bg-muted/10 p-4">
+                    <div className="mb-3 flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-semibold text-foreground">{GROUP_LABELS[group]}</p>
+                        <Badge variant="outline">{turn.organizedIdeas![group].length}</Badge>
+                      </div>
+                      {turn.organizedIdeas![group].length > 0 && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          onClick={() =>
+                            void onAddMany(
+                              turn.organizedIdeas![group]
+                                .filter((item) => !addedIdeaIds.includes(item.id))
+                                .map((item) => ({ group, ideaId: item.id, text: item.text })),
+                            )
+                          }
+                        >
+                          Add group
+                        </Button>
+                      )}
                     </div>
-                    {turn.organizedIdeas![group].length > 0 && (
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="ghost"
-                        onClick={() =>
-                          void onAddMany(
-                            turn.organizedIdeas![group]
-                              .filter((item) => !addedIdeaIds.includes(item.id))
-                              .map((item) => ({ group, ideaId: item.id, text: item.text })),
-                          )
-                        }
-                      >
-                        Add group
-                      </Button>
-                    )}
-                  </div>
 
-                  {turn.organizedIdeas![group].length === 0 ? (
-                    <p className="text-sm text-muted-foreground">Nothing here yet.</p>
-                  ) : (
-                    <div className="space-y-3">
-                      {turn.organizedIdeas![group].map((item) => {
-                        const isAdded = addedIdeaIds.includes(item.id)
+                    {turn.organizedIdeas![group].length === 0 ? (
+                      <p className="text-sm text-muted-foreground">Nothing here yet.</p>
+                    ) : (
+                      <div className="space-y-3">
+                        {turn.organizedIdeas![group].map((item) => {
+                          const isAdded = addedIdeaIds.includes(item.id)
 
-                        return (
-                          <div key={item.id} className="rounded-xl border border-border/60 bg-muted/20 p-3">
-                            <Input
-                              value={item.text}
-                              onChange={(event) => onIdeaChange(turn.id, group, item.id, event.target.value)}
-                              className="border-border/60 bg-background"
-                            />
+                          return (
+                            <div key={item.id} className="rounded-xl border border-border/60 bg-muted/20 p-3">
+                              <Input
+                                value={item.text}
+                                onChange={(event) => onIdeaChange(turn.id, group, item.id, event.target.value)}
+                                className="border-border/60 bg-background"
+                              />
                             <div className="mt-3 flex justify-end">
                               <Button
                                 type="button"
                                 size="sm"
-                                variant={isAdded ? 'outline' : 'default'}
-                                onClick={() => void onAddIdea(group, item.id, item.text)}
-                                disabled={isAdded}
-                              >
-                                <Plus className="mr-1.5 size-3.5" />
-                                {isAdded ? 'Added' : 'Add to Plan'}
-                              </Button>
+                                  variant={isAdded ? 'outline' : 'default'}
+                                  onClick={() => void onAddIdea(group, item.id, item.text)}
+                                  disabled={isAdded}
+                                >
+                                  <Plus className="mr-1.5 size-3.5" />
+                                  {isAdded ? 'Added' : 'Add to Plan'}
+                                </Button>
+                              </div>
                             </div>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  )}
-                </div>
-              ))}
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
-        )}
-      </div>
-    </AssistantBubble>
+          )}
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -765,7 +774,7 @@ function UserBubble({ children }: { children: React.ReactNode }) {
 function AssistantBubble({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex justify-start">
-      <div className="max-w-[92%] rounded-3xl rounded-tl-lg border border-border/60 bg-background px-4 py-4 shadow-sm">
+      <div className="max-w-[92%] rounded-3xl rounded-tl-lg border border-border/60 bg-white px-4 py-4 shadow-sm">
         {children}
       </div>
     </div>
