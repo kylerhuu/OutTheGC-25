@@ -343,25 +343,29 @@ export default function PlanPage() {
 
         <Card className="border-border/60 bg-card shadow-sm">
           <CardHeader className="pb-4">
-            <CardTitle className="text-xl font-semibold text-foreground">Trip plan</CardTitle>
+            <CardTitle className="text-xl font-semibold text-foreground">Plan the trip</CardTitle>
             <CardDescription>
-              This page is only for organizing the trip after the group has mostly decided where and when to go.
+              This page is for turning the group decision into a simple trip plan.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="rounded-2xl border border-border/60 bg-muted/20 p-5">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                <div>
-                  <p className="text-sm font-semibold text-foreground">Lock in the trip</p>
-                  <p className="text-sm text-muted-foreground">
-                    Finalize where you&apos;re going and when. If the group is still comparing options, use the <span className="font-medium text-foreground">Results</span> tab instead.
-                  </p>
+              <div className="space-y-3">
+                <p className="text-sm font-semibold text-foreground">What this page is for</p>
+                <div className="grid gap-2 text-sm text-muted-foreground sm:grid-cols-2">
+                  <p><span className="font-semibold text-foreground">Step 1:</span> choose the final destination</p>
+                  <p><span className="font-semibold text-foreground">Step 2:</span> choose the final dates</p>
+                  <p><span className="font-semibold text-foreground">Step 3:</span> write down the plan</p>
+                  <p><span className="font-semibold text-foreground">Step 4:</span> keep track of what still needs to get done</p>
                 </div>
+                <p className="text-sm text-muted-foreground">
+                  If the group is still comparing options or checking who is free, use the <span className="font-medium text-foreground">Results</span> tab instead.
+                </p>
               </div>
 
               <div className="mt-4 grid gap-4 md:grid-cols-[1.2fr_1fr]">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-foreground">Finalized destination</label>
+                  <label className="text-sm font-medium text-foreground">Step 1: Final destination</label>
                   <Input
                     value={draft.finalDestination || ''}
                     placeholder={suggestions?.topDestination || 'Choose the final destination'}
@@ -369,7 +373,7 @@ export default function PlanPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-foreground">Finalized dates</label>
+                  <label className="text-sm font-medium text-foreground">Step 2: Final dates</label>
                   <div className="grid grid-cols-2 gap-2">
                     <Input
                       type="date"
@@ -392,8 +396,8 @@ export default function PlanPage() {
             <div className="grid gap-4 lg:grid-cols-2">
               <div className="rounded-2xl border border-border/60 bg-background p-4">
                 <div className="mb-4">
-                  <p className="text-sm font-semibold text-foreground">Stay + getting there</p>
-                  <p className="text-xs text-muted-foreground">Keep the logistics in one place.</p>
+                  <p className="text-sm font-semibold text-foreground">Step 3: Plan the travel details</p>
+                  <p className="text-xs text-muted-foreground">Write down where you want to stay and how everyone will get there.</p>
                 </div>
                 <div className="space-y-4">
                   <div className="space-y-2">
@@ -419,8 +423,8 @@ export default function PlanPage() {
 
               <div className="rounded-2xl border border-border/60 bg-background p-4">
                 <div className="mb-4">
-                  <p className="text-sm font-semibold text-foreground">Ideas + notes</p>
-                  <p className="text-xs text-muted-foreground">Capture the rough plan without overthinking it.</p>
+                  <p className="text-sm font-semibold text-foreground">Step 3: Write down the plan</p>
+                  <p className="text-xs text-muted-foreground">Keep the rough schedule and extra notes in one place.</p>
                 </div>
                 <div className="space-y-4">
                   <div className="space-y-2">
@@ -448,7 +452,7 @@ export default function PlanPage() {
             <div className="rounded-xl border border-border/60 bg-muted/20 p-4">
               <div className="mb-4 flex items-center gap-2">
                 <CheckSquare className="size-4 text-primary" />
-                <p className="text-sm font-semibold text-foreground">Checklist</p>
+                <p className="text-sm font-semibold text-foreground">Step 4: Checklist</p>
               </div>
               <div className="flex gap-2">
                 <Input
@@ -503,7 +507,7 @@ export default function PlanPage() {
                 ) : saveMessage ? (
                   <p className="text-primary">{saveMessage}</p>
                 ) : (
-                  <p className="text-muted-foreground">Keep this page focused on the actual plan: final details, tasks, and reminders.</p>
+                  <p className="text-muted-foreground">This page is just for the final trip plan, tasks, and reminders.</p>
                 )}
               </div>
               <Button onClick={handleSavePlan} disabled={isSaving}>
