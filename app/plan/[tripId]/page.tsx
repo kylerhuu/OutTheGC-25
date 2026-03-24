@@ -345,6 +345,78 @@ export default function PlanPage() {
     [draft, savePlan],
   )
 
+  const handleApplyDraftToPlan = useCallback(
+    async (payload: {
+      sections: Array<{ title: string; items: string[] }>
+      mode: 'replace' | 'append'
+    }) => {
+      if (!draft) {
+        throw new Error('Plan is not ready yet.')
+      }
+
+      const nextDraft: UpdateTripPlanInput = { ...draft }
+      const itinerarySections: string[] = []
+      const lodgingLines: string[] = []
+      const transportLines: string[] = []
+      const noteLines: string[] = []
+
+      for (const section of payload.sections) {
+        const title = section.title.trim()
+        const sectionLines = section.items
+          .map((item) => item.trim())
+          .filter(Boolean)
+
+        if (sectionLines.length === 0) continue
+
+        if (/(stay|stays|lodging|hotel|airbnb)/i.test(title)) {
+          lodgingLines.push(...sectionLines)
+          continue
+        }
+
+        if (/(transport|transportation|flight|train|bus|get there|travel)/i.test(title)) {
+          transportLines.push(...sectionLines)
+          continue
+        }
+
+        if (/(note|notes|overview)/i.test(title)) {
+          noteLines.push(...sectionLines)
+          continue
+        }
+
+        itinerarySections.push(title)
+        itinerarySections.push(...sectionLines.map((line) => `- ${line}`))
+        itinerarySections.push('')
+      }
+
+      const appendBlock = (currentValue: string | undefined, nextLines: string[]) => {
+        const cleanedNext = nextLines.map((line) => line.trim()).filter(Boolean)
+        if (cleanedNext.length === 0) return currentValue ?? ''
+
+        const nextBlock = cleanedNext.join('\n').trim()
+        const current = (currentValue ?? '').trim()
+
+        if (payload.mode === 'replace' || !current) {
+          return nextBlock
+        }
+
+        return `${current}\n\n${nextBlock}`.trim()
+      }
+
+      nextDraft.itineraryIdeas = appendBlock(nextDraft.itineraryIdeas, itinerarySections)
+      nextDraft.lodgingNotes = appendBlock(nextDraft.lodgingNotes, lodgingLines.map((line) => `- ${line}`))
+      nextDraft.transportationNotes = appendBlock(
+        nextDraft.transportationNotes,
+        transportLines.map((line) => `- ${line}`),
+      )
+      nextDraft.groupNotes = appendBlock(nextDraft.groupNotes, noteLines.map((line) => `- ${line}`))
+
+      setDraft(nextDraft)
+      await savePlan(nextDraft)
+      setHighlightedPlanField('itineraryIdeas')
+    },
+    [draft, savePlan],
+  )
+
   const handleAddTodo = async () => {
     if (!newTodo.trim()) {
       setTodoError('Add a checklist item first.')
@@ -525,6 +597,7 @@ export default function PlanPage() {
               context={ideasContext}
               onAddToPlan={handleAddIdeaToPlan}
               onAddManyToPlan={handleAddManyIdeasToPlan}
+              onApplyDraftToPlan={handleApplyDraftToPlan}
             />
           ) : null
         ) : activePlannerTab === 'final-doc' ? (

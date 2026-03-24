@@ -130,9 +130,13 @@ interface TripIdeasTabProps {
     addedCount: number
     duplicateCount: number
   }>
+  onApplyDraftToPlan: (payload: {
+    sections: Array<{ title: string; items: string[] }>
+    mode: 'replace' | 'append'
+  }) => Promise<void>
 }
 
-export function TripIdeasTab({ context, onAddToPlan, onAddManyToPlan }: TripIdeasTabProps) {
+export function TripIdeasTab({ context, onAddToPlan, onAddManyToPlan, onApplyDraftToPlan }: TripIdeasTabProps) {
   const [composer, setComposer] = useState('')
   const [turns, setTurns] = useState<CopilotTurn[]>([])
   const [addedIdeaIds, setAddedIdeaIds] = useState<string[]>([])
@@ -140,10 +144,7 @@ export function TripIdeasTab({ context, onAddToPlan, onAddManyToPlan }: TripIdea
 
   const hasConversation = turns.length > 0
 
-  const latestAssistantTurn = useMemo(
-    () => [...turns].reverse().find((turn) => turn.role === 'assistant' && turn.organizedIdeas),
-    [turns],
-  )
+  const latestAssistantTurn = useMemo(() => [...turns].reverse().find((turn) => turn.role === 'assistant') ?? null, [turns])
 
   const runCopilot = async ({
     displayText,
@@ -347,6 +348,11 @@ export function TripIdeasTab({ context, onAddToPlan, onAddManyToPlan }: TripIdea
     })
   }
 
+  const handleAutoSend = async () => {
+    const { mode, intent } = inferIntentFromPrompt(composer)
+    await handleSend(mode, intent)
+  }
+
   const handleClarify = async (turn: CopilotTurn, nextIntent: CopilotIntent, label: string) => {
     const sourceText = turn.sourceText ?? turn.text
 
@@ -507,7 +513,7 @@ export function TripIdeasTab({ context, onAddToPlan, onAddManyToPlan }: TripIdea
                 <div className="flex flex-wrap gap-2">
                   <Button
                     variant="outline"
-                    onClick={() => void handleSend('organize', 'organize_notes')}
+                    onClick={() => void handleAutoSend()}
                     disabled={isSending}
                   >
                     {isSending ? (
@@ -540,6 +546,7 @@ export function TripIdeasTab({ context, onAddToPlan, onAddManyToPlan }: TripIdea
             onIdeaChange={handleIdeaChange}
             onAddIdea={handleAddSingleIdea}
             onAddMany={handleAddMany}
+            onApplyDraftToPlan={onApplyDraftToPlan}
           />
         </div>
       </CardContent>
@@ -606,12 +613,17 @@ function LiveDraftPanel({
   onIdeaChange,
   onAddIdea,
   onAddMany,
+  onApplyDraftToPlan,
 }: {
   turn: CopilotTurn | null
   addedIdeaIds: string[]
   onIdeaChange: (turnId: string, group: IdeaGroupKey, ideaId: string, value: string) => void
   onAddIdea: (group: IdeaGroupKey, ideaId: string, text: string) => void | Promise<void>
   onAddMany: (items: Array<{ group: IdeaGroupKey; ideaId: string; text: string }>) => void | Promise<void>
+  onApplyDraftToPlan: (payload: {
+    sections: Array<{ title: string; items: string[] }>
+    mode: 'replace' | 'append'
+  }) => Promise<void>
 }) {
   const hasOrganizedIdeas = !!turn?.organizedIdeas && Object.values(turn.organizedIdeas).some((group) => group.length > 0)
   const previewSections =
@@ -646,12 +658,33 @@ function LiveDraftPanel({
             <p className="mt-3 max-w-2xl text-base leading-7 text-muted-foreground">
               {turn.notesSummary || turn.text}
             </p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => void onApplyDraftToPlan({ sections: previewSections, mode: 'replace' })}
+                disabled={previewSections.length === 0}
+              >
+                Use this in Plan
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => void onApplyDraftToPlan({ sections: previewSections, mode: 'append' })}
+                disabled={previewSections.length === 0}
+              >
+                Add to Plan
+              </Button>
+            </div>
           </header>
 
           <section className="space-y-5">
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Preview</p>
             {previewSections.length === 0 ? (
-              <p className="text-base leading-7 text-muted-foreground">The latest reply did not include a structured draft yet.</p>
+              <p className="text-base leading-7 text-muted-foreground">
+                This reply did not build a structured draft yet. Ask Trip Copilot to “make an itinerary,” “group this by location,” or “turn this into a final trip plan.”
+              </p>
             ) : (
               <div className="space-y-8">
                 {previewSections.map((section) => (
@@ -1113,4 +1146,27 @@ function inferLikelyStructureFromText(text: string): DetectedStructure {
   }
 
   return 'loose'
+}
+
+function inferIntentFromPrompt(text: string): { mode: CopilotMode; intent: CopilotIntent } {
+  const normalized = text.toLowerCase()
+
+  if (/(final doc|final plan|shareable|clean doc|printable)/i.test(normalized)) {
+    return { mode: 'build_itinerary', intent: 'turn_into_final_doc' }
+  }
+
+  if (/(group by location|by location|by area|by city|by neighborhood)/i.test(normalized)) {
+    return { mode: 'build_itinerary', intent: 'group_by_location' }
+  }
+
+  if (/(stay|hotel|airbnb|lodging|flight|train|transport|logistics)/i.test(normalized) &&
+      /(pull|extract|find|organize)/i.test(normalized)) {
+    return { mode: 'organize', intent: 'pull_stays_transport' }
+  }
+
+  if (/(itinerary|day by day|day-by-day|build a plan|make a plan|plan this trip|turn this into a plan)/i.test(normalized)) {
+    return { mode: 'build_itinerary', intent: 'make_itinerary' }
+  }
+
+  return { mode: 'organize', intent: 'organize_notes' }
 }
