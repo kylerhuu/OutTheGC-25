@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Calendar } from 'lucide-react'
 import type { ParticipantData } from '@/app/event/[tripId]/page'
@@ -18,7 +18,16 @@ interface DayData {
   percentage: number
 }
 
+interface DateRangeOption {
+  start: Date
+  end: Date
+  score: number
+  minAvailable: number
+}
+
 export function AvailabilityHeatmap({ participants, tripDateRange, tripDurationDays }: AvailabilityHeatmapProps) {
+  const [activeWindowKey, setActiveWindowKey] = useState<string | null>(null)
+
   // Generate all days in the trip date range with availability counts
   const heatmapData = useMemo(() => {
     const days: DayData[] = []
@@ -96,57 +105,57 @@ export function AvailabilityHeatmap({ participants, tripDateRange, tripDurationD
 
   const dayLabels = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
   const suggestedDuration = Math.min(tripDurationDays ?? 4, Math.max(1, heatmapData.length))
-  const monthMarkers = useMemo(() => {
-    const markers: Array<{ index: number; label: string }> = []
-
-    heatmapData.forEach((day, index) => {
-      const previous = heatmapData[index - 1]
-      if (!previous || previous.date.getMonth() !== day.date.getMonth()) {
-        markers.push({
-          index,
-          label: day.date.toLocaleDateString('en-US', { month: 'short' }),
-        })
-      }
-    })
-
-    return markers
-  }, [heatmapData])
 
   const bestWindows = useMemo(() => {
     if (participants.length === 0 || heatmapData.length === 0 || suggestedDuration > heatmapData.length) {
       return []
     }
 
-    const windows: Array<{
-      start: Date
-      end: Date
-      score: number
-      average: number
-      perfectDays: number
-    }> = []
+    const windows: DateRangeOption[] = []
 
     for (let startIndex = 0; startIndex <= heatmapData.length - suggestedDuration; startIndex += 1) {
       const slice = heatmapData.slice(startIndex, startIndex + suggestedDuration)
       const totalAvailable = slice.reduce((sum, day) => sum + day.count, 0)
-      const perfectDays = slice.filter((day) => day.count === day.total).length
+      const minAvailable = slice.reduce((lowest, day) => Math.min(lowest, day.count), slice[0]?.count ?? 0)
 
       windows.push({
         start: slice[0].date,
         end: slice[slice.length - 1].date,
         score: totalAvailable,
-        average: totalAvailable / slice.length,
-        perfectDays,
+        minAvailable,
       })
     }
 
-    return windows
+    const sorted = windows
       .sort((a, b) => {
         if (b.score !== a.score) return b.score - a.score
-        if (b.perfectDays !== a.perfectDays) return b.perfectDays - a.perfectDays
+        if (b.minAvailable !== a.minAvailable) return b.minAvailable - a.minAvailable
         return a.start.getTime() - b.start.getTime()
       })
-      .slice(0, 3)
+
+    const distinct: DateRangeOption[] = []
+
+    for (const window of sorted) {
+      const overlapsExisting = distinct.some((existing) => {
+        return window.start <= existing.end && window.end >= existing.start
+      })
+
+      if (!overlapsExisting) {
+        distinct.push(window)
+      }
+
+      if (distinct.length === 3) {
+        break
+      }
+    }
+
+    return distinct
   }, [heatmapData, participants.length, suggestedDuration])
+
+  const activeWindow = useMemo(() => {
+    if (!bestWindows.length) return null
+    return bestWindows.find((window) => getWindowKey(window) === activeWindowKey) ?? null
+  }, [activeWindowKey, bestWindows])
 
   if (participants.length === 0) {
     return (
@@ -177,30 +186,34 @@ export function AvailabilityHeatmap({ participants, tripDateRange, tripDurationD
           {bestWindows.length > 0 && (
             <div className="rounded-xl border border-border/50 bg-muted/30 p-3">
               <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Best {suggestedDuration}-day windows
-              </p>
-              <p className="mb-3 text-xs text-muted-foreground">
-                Based on the dates people selected inside this trip&apos;s overall date range.
+                Best Dates to Go
               </p>
               <div className="space-y-2">
                 {bestWindows.map((window, index) => (
                   <div
                     key={`${window.start.toISOString()}-${window.end.toISOString()}`}
-                    className="flex items-start justify-between gap-3 rounded-lg bg-background px-3 py-2"
+                    className={`flex cursor-pointer items-start justify-between gap-3 rounded-lg border px-3 py-2 transition-colors ${
+                      activeWindowKey === getWindowKey(window)
+                        ? 'border-primary/40 bg-primary/10'
+                        : 'border-transparent bg-background hover:border-border/70 hover:bg-muted/40'
+                    }`}
+                    onMouseEnter={() => setActiveWindowKey(getWindowKey(window))}
+                    onMouseLeave={() => setActiveWindowKey(null)}
+                    onClick={() =>
+                      setActiveWindowKey((current) =>
+                        current === getWindowKey(window) ? null : getWindowKey(window),
+                      )
+                    }
                   >
                     <div>
                       <p className="text-sm font-medium text-foreground">
                         {window.start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {window.end.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                       </p>
-                      <p className="text-xs text-muted-foreground">
-                        Avg {window.average.toFixed(1)} people available per day
-                      </p>
+                      <p className="text-xs text-muted-foreground">{window.minAvailable}/{participants.length} available</p>
                     </div>
                     <div className="text-right">
                       <p className="text-xs font-semibold text-primary">#{index + 1}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {window.perfectDays} perfect day{window.perfectDays === 1 ? '' : 's'}
-                      </p>
+                      <p className="text-xs text-muted-foreground">{suggestedDuration} day{suggestedDuration === 1 ? '' : 's'}</p>
                     </div>
                   </div>
                 ))}
@@ -217,16 +230,6 @@ export function AvailabilityHeatmap({ participants, tripDateRange, tripDurationD
             ))}
           </div>
 
-          {monthMarkers.length > 0 && (
-            <div className="flex flex-wrap gap-2 text-xs font-medium text-muted-foreground">
-              {monthMarkers.map((marker) => (
-                <span key={`${marker.label}-${marker.index}`} className="rounded-full bg-muted px-2 py-1">
-                  {marker.label}
-                </span>
-              ))}
-            </div>
-          )}
-
           {/* Heatmap grid */}
           <div className="flex flex-col gap-1">
             {weeks.map((week, weekIndex) => (
@@ -235,13 +238,28 @@ export function AvailabilityHeatmap({ participants, tripDateRange, tripDurationD
                   if (day.count === -1) {
                     return <div key={dayIndex} className="aspect-square max-h-9 rounded-sm" />
                   }
+                  const isFirstOfMonth =
+                    day.date.getDate() === 1 ||
+                    day.date.getTime() === heatmapData[0]?.date.getTime()
+                  const isHighlighted =
+                    activeWindow &&
+                    day.date >= activeWindow.start &&
+                    day.date <= activeWindow.end
+
                   return (
                     <div
                       key={dayIndex}
-                      className={`aspect-square max-h-9 rounded-sm flex items-center justify-center text-[11px] font-medium transition-colors cursor-default ${getIntensityClass(day.percentage)} ${day.percentage >= 75 ? 'text-primary-foreground' : 'text-foreground/70'}`}
+                      className={`relative flex aspect-square max-h-11 min-h-10 flex-col items-center justify-center rounded-md border text-[11px] font-medium transition-all cursor-default ${
+                        isHighlighted ? 'border-primary ring-2 ring-primary/20' : 'border-transparent'
+                      } ${getIntensityClass(day.percentage)} ${day.percentage >= 75 ? 'text-primary-foreground' : 'text-foreground/80'}`}
                       title={`${day.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}: ${day.count}/${day.total} available`}
                     >
-                      {day.date.getDate()}
+                      {isFirstOfMonth && (
+                        <span className={`text-[9px] font-semibold uppercase tracking-wide ${day.percentage >= 75 ? 'text-primary-foreground/90' : 'text-muted-foreground'}`}>
+                          {day.date.toLocaleDateString('en-US', { month: 'short' })}
+                        </span>
+                      )}
+                      <span>{day.date.getDate()}</span>
                     </div>
                   )
                 })}
@@ -265,4 +283,8 @@ export function AvailabilityHeatmap({ participants, tripDateRange, tripDurationD
       </CardContent>
     </Card>
   )
+}
+
+function getWindowKey(window: { start: Date; end: Date }) {
+  return `${window.start.toISOString()}-${window.end.toISOString()}`
 }
