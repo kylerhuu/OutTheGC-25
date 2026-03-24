@@ -345,75 +345,103 @@ export default function PlanPage() {
           <CardHeader className="pb-4">
             <CardTitle className="text-xl font-semibold text-foreground">Trip plan</CardTitle>
             <CardDescription>
-              Use this page to organize ideas, rough plans, and reminders once the group is aligned. It&apos;s here to keep everyone on the same page, not to replace full booking tools.
+              This page is only for organizing the trip after the group has mostly decided where and when to go.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground">Finalized destination</label>
-                <Input
-                  value={draft.finalDestination || ''}
-                  placeholder={suggestions?.topDestination || 'Choose the final destination'}
-                  onChange={(event) => handleDraftChange('finalDestination', event.target.value)}
-                />
+            <div className="rounded-2xl border border-border/60 bg-muted/20 p-5">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-foreground">Lock in the trip</p>
+                  <p className="text-sm text-muted-foreground">
+                    Finalize where you&apos;re going and when. If the group is still comparing options, use the <span className="font-medium text-foreground">Results</span> tab instead.
+                  </p>
+                </div>
               </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground">Finalized dates</label>
-                <div className="grid grid-cols-2 gap-2">
+
+              <div className="mt-4 grid gap-4 md:grid-cols-[1.2fr_1fr]">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground">Finalized destination</label>
                   <Input
-                    type="date"
-                    value={toDateInputValue(draft.finalStartDate || null)}
-                    onChange={(event) => handleDraftChange('finalStartDate', fromDateInputValue(event.target.value))}
-                  />
-                  <Input
-                    type="date"
-                    value={toDateInputValue(draft.finalEndDate || null)}
-                    onChange={(event) => handleDraftChange('finalEndDate', fromDateInputValue(event.target.value))}
+                    value={draft.finalDestination || ''}
+                    placeholder={suggestions?.topDestination || 'Choose the final destination'}
+                    onChange={(event) => handleDraftChange('finalDestination', event.target.value)}
                   />
                 </div>
-                {suggestions?.bestDates && (
-                  <p className="text-xs text-muted-foreground">Suggested from responses: {suggestions.bestDates}</p>
-                )}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground">Finalized dates</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Input
+                      type="date"
+                      value={toDateInputValue(draft.finalStartDate || null)}
+                      onChange={(event) => handleDraftChange('finalStartDate', fromDateInputValue(event.target.value))}
+                    />
+                    <Input
+                      type="date"
+                      value={toDateInputValue(draft.finalEndDate || null)}
+                      onChange={(event) => handleDraftChange('finalEndDate', fromDateInputValue(event.target.value))}
+                    />
+                  </div>
+                  {suggestions?.bestDates && (
+                    <p className="text-xs text-muted-foreground">Suggested from responses: {suggestions.bestDates}</p>
+                  )}
+                </div>
               </div>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground">Itinerary ideas</label>
-                <Textarea
-                  value={draft.itineraryIdeas || ''}
-                  onChange={(event) => handleDraftChange('itineraryIdeas', event.target.value)}
-                  placeholder={SECTION_PLACEHOLDERS.itineraryIdeas}
-                  className="min-h-[180px] resize-none"
-                />
+            <div className="grid gap-4 lg:grid-cols-2">
+              <div className="rounded-2xl border border-border/60 bg-background p-4">
+                <div className="mb-4">
+                  <p className="text-sm font-semibold text-foreground">Stay + getting there</p>
+                  <p className="text-xs text-muted-foreground">Keep the logistics in one place.</p>
+                </div>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-foreground">Lodging</label>
+                    <Textarea
+                      value={draft.lodgingNotes || ''}
+                      onChange={(event) => handleDraftChange('lodgingNotes', event.target.value)}
+                      placeholder={SECTION_PLACEHOLDERS.lodgingNotes}
+                      className="min-h-[150px] resize-none"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-foreground">Transportation</label>
+                    <Textarea
+                      value={draft.transportationNotes || ''}
+                      onChange={(event) => handleDraftChange('transportationNotes', event.target.value)}
+                      placeholder={SECTION_PLACEHOLDERS.transportationNotes}
+                      className="min-h-[150px] resize-none"
+                    />
+                  </div>
+                </div>
               </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground">Lodging</label>
-                <Textarea
-                  value={draft.lodgingNotes || ''}
-                  onChange={(event) => handleDraftChange('lodgingNotes', event.target.value)}
-                  placeholder={SECTION_PLACEHOLDERS.lodgingNotes}
-                  className="min-h-[180px] resize-none"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground">Transportation</label>
-                <Textarea
-                  value={draft.transportationNotes || ''}
-                  onChange={(event) => handleDraftChange('transportationNotes', event.target.value)}
-                  placeholder={SECTION_PLACEHOLDERS.transportationNotes}
-                  className="min-h-[180px] resize-none"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground">Notes</label>
-                <Textarea
-                  value={draft.groupNotes || ''}
-                  onChange={(event) => handleDraftChange('groupNotes', event.target.value)}
-                  placeholder={SECTION_PLACEHOLDERS.groupNotes}
-                  className="min-h-[180px] resize-none"
-                />
+
+              <div className="rounded-2xl border border-border/60 bg-background p-4">
+                <div className="mb-4">
+                  <p className="text-sm font-semibold text-foreground">Ideas + notes</p>
+                  <p className="text-xs text-muted-foreground">Capture the rough plan without overthinking it.</p>
+                </div>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-foreground">Itinerary ideas</label>
+                    <Textarea
+                      value={draft.itineraryIdeas || ''}
+                      onChange={(event) => handleDraftChange('itineraryIdeas', event.target.value)}
+                      placeholder={SECTION_PLACEHOLDERS.itineraryIdeas}
+                      className="min-h-[150px] resize-none"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-foreground">Notes</label>
+                    <Textarea
+                      value={draft.groupNotes || ''}
+                      onChange={(event) => handleDraftChange('groupNotes', event.target.value)}
+                      placeholder={SECTION_PLACEHOLDERS.groupNotes}
+                      className="min-h-[150px] resize-none"
+                    />
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -475,7 +503,7 @@ export default function PlanPage() {
                 ) : saveMessage ? (
                   <p className="text-primary">{saveMessage}</p>
                 ) : (
-                  <p className="text-muted-foreground">Use this page for the final trip plan, not brainstorming.</p>
+                  <p className="text-muted-foreground">Keep this page focused on the actual plan: final details, tasks, and reminders.</p>
                 )}
               </div>
               <Button onClick={handleSavePlan} disabled={isSaving}>
