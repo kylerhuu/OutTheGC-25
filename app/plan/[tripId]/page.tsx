@@ -2,13 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useParams } from 'next/navigation'
-import { CalendarDays, Loader2, MapPinned, Sparkles } from 'lucide-react'
+import { Loader2, Sparkles } from 'lucide-react'
 import { EventTopBar } from '@/components/tripsync/event-top-bar'
 import { FinalDocTab } from '@/components/tripsync/final-doc-tab'
 import { TripSnapshot } from '@/components/tripsync/trip-snapshot'
+import { getBestDateWindows, getTripLengthDays } from '@/lib/availability'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
 import { Textarea } from '@/components/ui/textarea'
 import { buildFinalDocContent } from '@/lib/final-doc'
@@ -16,7 +16,6 @@ import { parseStoredDate } from '@/lib/date-utils'
 import type {
   TripPlanPageData,
   TripPlanRecord,
-  TripPlanTodoRecord,
   UpdateTripPlanInput,
 } from '@/lib/trip-types'
 
@@ -61,15 +60,6 @@ function formatDateRange(from: Date, to: Date) {
   return `${from.toLocaleDateString('en-US', options)} - ${to.toLocaleDateString('en-US', options)}`
 }
 
-function toDateInputValue(value: string | null) {
-  if (!value) return ''
-  return new Date(value).toISOString().slice(0, 10)
-}
-
-function fromDateInputValue(value: string) {
-  return value ? new Date(`${value}T00:00:00.000Z`).toISOString() : null
-}
-
 export default function PlanPage() {
   const params = useParams()
   const tripId = params.tripId as string
@@ -82,6 +72,7 @@ export default function PlanPage() {
   const [saveError, setSaveError] = useState<string | null>(null)
   const [activePlannerTab, setActivePlannerTab] = useState<'plan' | 'final-doc'>('plan')
   const [isOrganizing, setIsOrganizing] = useState(false)
+  const [tripLengthDays, setTripLengthDays] = useState(4)
 
   const loadPlan = useCallback(async () => {
     setIsLoading(true)
@@ -138,18 +129,32 @@ export default function PlanPage() {
     if (!data) return null
 
     return {
-      topDestination: data.suggestions.topDestinations[0]?.label || '',
-      bestDates: data.suggestions.bestDateWindows[0]
-        ? `${parseStoredDate(data.suggestions.bestDateWindows[0].startDate).toLocaleDateString('en-US', {
-            month: 'short',
-            day: 'numeric',
-          })} - ${parseStoredDate(data.suggestions.bestDateWindows[0].endDate).toLocaleDateString('en-US', {
-            month: 'short',
-            day: 'numeric',
-          })}`
-        : '',
+      topDestinations: data.suggestions.topDestinations.slice(0, 4),
     }
   }, [data])
+
+  const maxTripLengthDays = useMemo(() => {
+    if (!data) return 30
+    return Math.min(30, getTripLengthDays(data.trip.startDate, data.trip.endDate))
+  }, [data])
+
+  useEffect(() => {
+    if (!data) return
+    if (draft?.finalStartDate && draft.finalEndDate) {
+      setTripLengthDays(getTripLengthDays(draft.finalStartDate, draft.finalEndDate))
+      return
+    }
+    setTripLengthDays(Math.min(data.suggestions.suggestedDurationDays, maxTripLengthDays))
+  }, [data, draft?.finalEndDate, draft?.finalStartDate, maxTripLengthDays])
+
+  const suggestedWindows = useMemo(() => {
+    if (!data) return []
+    return getBestDateWindows(
+      data.trip.responses,
+      { startDate: data.trip.startDate, endDate: data.trip.endDate },
+      tripLengthDays,
+    )
+  }, [data, tripLengthDays])
 
   const handleDraftChange = <K extends keyof UpdateTripPlanInput>(key: K, value: UpdateTripPlanInput[K]) => {
     setDraft((current) => ({
@@ -291,9 +296,6 @@ export default function PlanPage() {
           shareUrl={shareUrl}
           activeTab="plan"
         />
-
-        <TripSnapshot trip={data.trip} plan={data.plan} />
-
         <div className="inline-flex w-fit items-center rounded-2xl border border-border bg-muted/40 p-1 shadow-sm">
           {(['plan', 'final-doc'] as const).map((tab) => (
             <button
@@ -323,46 +325,25 @@ export default function PlanPage() {
             </CardHeader>
 
             <CardContent className="space-y-8">
-              <div className="rounded-2xl border border-border/60 bg-muted/20 p-5">
-                <div className="grid gap-4 md:grid-cols-[1.2fr_1fr]">
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <MapPinned className="size-4 text-primary" />
-                      <label className="text-sm font-semibold text-foreground">Final destination</label>
-                    </div>
-                    <Input
-                      value={draft.finalDestination || ''}
-                      placeholder={suggestions?.topDestination || 'Choose the final destination'}
-                      onChange={(event) => handleDraftChange('finalDestination', event.target.value)}
-                      className="border-border/60"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <CalendarDays className="size-4 text-primary" />
-                      <label className="text-sm font-semibold text-foreground">Final dates</label>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <Input
-                        type="date"
-                        value={toDateInputValue(draft.finalStartDate || null)}
-                        onChange={(event) => handleDraftChange('finalStartDate', fromDateInputValue(event.target.value))}
-                        className="border-border/60"
-                      />
-                      <Input
-                        type="date"
-                        value={toDateInputValue(draft.finalEndDate || null)}
-                        onChange={(event) => handleDraftChange('finalEndDate', fromDateInputValue(event.target.value))}
-                        className="border-border/60"
-                      />
-                    </div>
-                    {suggestions?.bestDates && (
-                      <p className="text-xs text-muted-foreground">Suggested from responses: {suggestions.bestDates}</p>
-                    )}
-                  </div>
-                </div>
-              </div>
+              <TripSnapshot
+                trip={data.trip}
+                plan={{
+                  ...data.plan,
+                  finalDestination: draft.finalDestination || '',
+                  finalStartDate: draft.finalStartDate || null,
+                  finalEndDate: draft.finalEndDate || null,
+                }}
+                topDestinations={suggestions?.topDestinations}
+                suggestedWindows={suggestedWindows}
+                selectedTripLengthDays={tripLengthDays}
+                maxTripLengthDays={maxTripLengthDays}
+                onTripLengthChange={setTripLengthDays}
+                onSelectDestination={(value) => handleDraftChange('finalDestination', value)}
+                onSelectDates={(startDate, endDate) => {
+                  handleDraftChange('finalStartDate', startDate)
+                  handleDraftChange('finalEndDate', endDate)
+                }}
+              />
 
               <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-primary/15 bg-gradient-to-r from-primary/8 to-fuchsia-500/5 p-4">
                 <div>

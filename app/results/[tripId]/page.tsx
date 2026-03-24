@@ -2,15 +2,17 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useParams } from 'next/navigation'
-import { Calendar, DollarSign, Heart, MapPin, MessageSquare, Users } from 'lucide-react'
+import { Calendar, DollarSign, Heart, Loader2, MapPin, MessageSquare, Users } from 'lucide-react'
 import { EventTopBar } from '@/components/tripsync/event-top-bar'
 import { BestTripOption } from '@/components/tripsync/best-trip-option'
 import { AvailabilityHeatmap } from '@/components/tripsync/availability-heatmap'
-import { parseStoredDate } from '@/lib/date-utils'
+import { parseStoredDate, toDateOnlyString } from '@/lib/date-utils'
+import { getBestDateWindows, getTripLengthDays } from '@/lib/availability'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { Slider } from '@/components/ui/slider'
-import type { PublicResponseRecord, TripWithResponses } from '@/lib/trip-types'
+import type { PublicResponseRecord, TripPlanPageData, TripPlanRecord, TripWithResponses } from '@/lib/trip-types'
 
 interface ParticipantData {
   id: string
@@ -25,6 +27,9 @@ interface ParticipantData {
 
 interface TripResponsePayload {
   trip?: TripWithResponses
+  error?: string
+}
+interface PlanPayload extends Partial<TripPlanPageData> {
   error?: string
 }
 
@@ -78,54 +83,6 @@ function formatDateRange(from: Date, to: Date) {
   return `${from.toLocaleDateString('en-US', options)} - ${to.toLocaleDateString('en-US', options)}`
 }
 
-function getBestWindow(
-  participants: ParticipantData[],
-  tripDateRange: { from: Date; to: Date },
-  duration: number,
-) {
-  const days: Array<{ date: Date; count: number }> = []
-  const currentDate = new Date(tripDateRange.from)
-  const endDate = new Date(tripDateRange.to)
-
-  while (currentDate <= endDate) {
-    const dayStart = new Date(currentDate)
-    dayStart.setHours(0, 0, 0, 0)
-
-    const availableCount = participants.filter((participant) => {
-      if (!participant.availability) return false
-      const availableFrom = new Date(participant.availability.from)
-      const availableTo = new Date(participant.availability.to)
-      availableFrom.setHours(0, 0, 0, 0)
-      availableTo.setHours(23, 59, 59, 999)
-      return dayStart >= availableFrom && dayStart <= availableTo
-    }).length
-
-    days.push({ date: new Date(currentDate), count: availableCount })
-    currentDate.setDate(currentDate.getDate() + 1)
-  }
-
-  if (participants.length === 0 || days.length < duration) {
-    return null
-  }
-
-  let best: { start: Date; end: Date; average: number } | null = null
-
-  for (let index = 0; index <= days.length - duration; index += 1) {
-    const slice = days.slice(index, index + duration)
-    const average = slice.reduce((sum, day) => sum + day.count, 0) / slice.length
-
-    if (!best || average > best.average) {
-      best = {
-        start: slice[0].date,
-        end: slice[slice.length - 1].date,
-        average,
-      }
-    }
-  }
-
-  return best
-}
-
 // Generate initials avatar color from name
 function getAvatarColor(name: string) {
   const colors = [
@@ -155,24 +112,33 @@ export default function ResultsPage() {
   const tripId = params.tripId as string
   const [trip, setTrip] = useState<TripWithResponses | null>(null)
   const [participants, setParticipants] = useState<ParticipantData[]>([])
+  const [plan, setPlan] = useState<TripPlanRecord | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [tripDurationDays, setTripDurationDays] = useState(4)
+  const [isApplyingSelection, setIsApplyingSelection] = useState(false)
+  const [applyMessage, setApplyMessage] = useState<string | null>(null)
+  const [applyError, setApplyError] = useState<string | null>(null)
 
   const loadTrip = useCallback(async () => {
     setIsLoading(true)
     setLoadError(null)
 
     try {
-      const response = await fetch(`/api/trips/${tripId}`, { cache: 'no-store' })
-      const data = (await response.json()) as TripResponsePayload
+      const [tripResponse, planResponse] = await Promise.all([
+        fetch(`/api/trips/${tripId}`, { cache: 'no-store' }),
+        fetch(`/api/trips/${tripId}/plan`, { cache: 'no-store' }),
+      ])
+      const tripData = (await tripResponse.json()) as TripResponsePayload
+      const planData = (await planResponse.json()) as PlanPayload
 
-      if (!response.ok || !data.trip) {
-        throw new Error(data.error || 'Unable to load trip results.')
+      if (!tripResponse.ok || !tripData.trip) {
+        throw new Error(tripData.error || 'Unable to load trip results.')
       }
 
-      setTrip(data.trip)
-      setParticipants(data.trip.responses.map(responseToParticipant))
+      setTrip(tripData.trip)
+      setParticipants(tripData.trip.responses.map(responseToParticipant))
+      setPlan(planResponse.ok && planData.plan ? planData.plan : null)
     } catch (error) {
       setLoadError(error instanceof Error ? error.message : 'Unable to load trip results.')
     } finally {
@@ -239,30 +205,69 @@ export default function ResultsPage() {
     [participants],
   )
 
-  const bestWindow = useMemo(() => {
+  const bestWindows = useMemo(() => {
     if (!trip) return null
-    return getBestWindow(participants, {
-      from: parseStoredDate(trip.startDate),
-      to: parseStoredDate(trip.endDate),
-    }, tripDurationDays)
+    return getBestDateWindows(
+      trip.responses,
+      { startDate: trip.startDate, endDate: trip.endDate },
+      tripDurationDays,
+    )
   }, [participants, trip, tripDurationDays])
+  const bestWindow = bestWindows?.[0] ?? null
 
   const maxTripDuration = useMemo(() => {
     if (!trip) return 30
-    return Math.min(
-      30,
-      Math.max(
-        1,
-        Math.floor(
-          (parseStoredDate(trip.endDate).getTime() - parseStoredDate(trip.startDate).getTime()) / (1000 * 60 * 60 * 24),
-        ) + 1,
-      ),
-    )
+    return Math.min(30, getTripLengthDays(trip.startDate, trip.endDate))
   }, [trip])
 
   useEffect(() => {
     setTripDurationDays((current) => Math.min(current, maxTripDuration))
   }, [maxTripDuration])
+
+  useEffect(() => {
+    if (!trip) return
+    if (plan?.finalStartDate && plan?.finalEndDate) {
+      setTripDurationDays(getTripLengthDays(plan.finalStartDate, plan.finalEndDate))
+      return
+    }
+    setTripDurationDays(Math.min(4, maxTripDuration))
+  }, [maxTripDuration, plan?.finalEndDate, plan?.finalStartDate, trip])
+
+  const currentPlanWindowKey = useMemo(() => {
+    if (!plan?.finalStartDate || !plan.finalEndDate) return null
+    return `${toDateOnlyString(parseStoredDate(plan.finalStartDate))}-${toDateOnlyString(parseStoredDate(plan.finalEndDate))}`
+  }, [plan?.finalEndDate, plan?.finalStartDate])
+
+  const savePlanSelection = useCallback(
+    async (input: Partial<TripPlanRecord>) => {
+      setIsApplyingSelection(true)
+      setApplyError(null)
+      setApplyMessage(null)
+
+      try {
+        const response = await fetch(`/api/trips/${tripId}/plan`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(input),
+        })
+        const payload = (await response.json()) as { plan?: TripPlanRecord; error?: string }
+
+        if (!response.ok || !payload.plan) {
+          throw new Error(payload.error || 'Unable to save this plan selection.')
+        }
+
+        setPlan(payload.plan)
+        setApplyMessage('Plan updated.')
+      } catch (error) {
+        setApplyError(error instanceof Error ? error.message : 'Unable to save this plan selection.')
+      } finally {
+        setIsApplyingSelection(false)
+      }
+    },
+    [tripId],
+  )
 
   if (isLoading) {
     return (
@@ -291,7 +296,7 @@ export default function ResultsPage() {
   }
 
   const bestDateLabel = bestWindow
-    ? `${bestWindow.start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${bestWindow.end.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+    ? `${parseStoredDate(bestWindow.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${parseStoredDate(bestWindow.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
     : null
 
   return (
@@ -310,7 +315,7 @@ export default function ResultsPage() {
         {bestWindow && sortedDestinations.length > 0 && (
           <BestTripOption
             bestDates={bestDateLabel || '—'}
-            peopleCount={Math.round(bestWindow.average)}
+            peopleCount={bestWindow.minAvailable}
             topDestinations={sortedDestinations.map(([dest]) => dest)}
           />
         )}
@@ -325,9 +330,27 @@ export default function ResultsPage() {
             </p>
             <p className="text-xs text-muted-foreground">
               {bestWindow
-                ? `${Math.round(bestWindow.average)}/${participants.length} people free · ${tripDurationDays}-day trip`
+                ? `${bestWindow.minAvailable}/${participants.length} people free · ${tripDurationDays}-day trip`
                 : 'Waiting on more responses'}
             </p>
+            {bestWindow && (
+              <div className="pt-2">
+                <Button
+                  size="sm"
+                  variant={currentPlanWindowKey === `${bestWindow.startDate}-${bestWindow.endDate}` ? 'default' : 'outline'}
+                  onClick={() =>
+                    void savePlanSelection({
+                      finalStartDate: bestWindow.startDate,
+                      finalEndDate: bestWindow.endDate,
+                    })
+                  }
+                  disabled={isApplyingSelection}
+                >
+                  {isApplyingSelection ? <Loader2 className="size-4 animate-spin" /> : null}
+                  {currentPlanWindowKey === `${bestWindow.startDate}-${bestWindow.endDate}` ? 'Selected in Plan' : 'Use these dates in Plan'}
+                </Button>
+              </div>
+            )}
           </div>
           {/* Top destination */}
           <div className="rounded-2xl border border-border bg-card p-5 flex flex-col gap-1.5">
@@ -340,6 +363,18 @@ export default function ResultsPage() {
                 ? `${sortedDestinations[0][1]} of ${participants.length} votes`
                 : 'No picks yet'}
             </p>
+            {sortedDestinations[0] && (
+              <div className="pt-2">
+                <Button
+                  size="sm"
+                  variant={plan?.finalDestination === sortedDestinations[0][0] ? 'default' : 'outline'}
+                  onClick={() => void savePlanSelection({ finalDestination: sortedDestinations[0][0] })}
+                  disabled={isApplyingSelection}
+                >
+                  {plan?.finalDestination === sortedDestinations[0][0] ? 'Selected in Plan' : 'Use this destination in Plan'}
+                </Button>
+              </div>
+            )}
           </div>
           {/* Group size */}
           <div className="rounded-2xl border border-border bg-card p-5 flex flex-col gap-1.5">
@@ -389,7 +424,21 @@ export default function ResultsPage() {
           participants={participants}
           tripDateRange={{ from: parseStoredDate(trip.startDate), to: parseStoredDate(trip.endDate) }}
           tripDurationDays={tripDurationDays}
+          onApplyWindow={(window) =>
+            void savePlanSelection({
+              finalStartDate: toDateOnlyString(window.start),
+              finalEndDate: toDateOnlyString(window.end),
+            })
+          }
+          appliedWindowKey={currentPlanWindowKey}
         />
+
+        {(applyMessage || applyError) && (
+          <div className="rounded-2xl border border-border bg-card px-4 py-3">
+            {applyMessage && <p className="text-sm text-foreground">{applyMessage}</p>}
+            {applyError && <p className="text-sm text-destructive">{applyError}</p>}
+          </div>
+        )}
 
         {/* Destination votes + budget + vibe — editorial 3-col */}
         <div className="grid gap-5 lg:grid-cols-3">

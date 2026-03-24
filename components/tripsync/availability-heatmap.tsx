@@ -10,6 +10,8 @@ interface AvailabilityHeatmapProps {
   participants: ParticipantData[]
   tripDateRange: { from: Date; to: Date }
   tripDurationDays?: number
+  onApplyWindow?: (window: { start: Date; end: Date }) => void
+  appliedWindowKey?: string | null
 }
 
 interface DayData {
@@ -32,7 +34,13 @@ interface MonthSection {
   weeks: DayData[][]
 }
 
-export function AvailabilityHeatmap({ participants, tripDateRange, tripDurationDays }: AvailabilityHeatmapProps) {
+export function AvailabilityHeatmap({
+  participants,
+  tripDateRange,
+  tripDurationDays,
+  onApplyWindow,
+  appliedWindowKey,
+}: AvailabilityHeatmapProps) {
   const [activeWindowKey, setActiveWindowKey] = useState<string | null>(null)
   const [showCalendar, setShowCalendar] = useState(false)
 
@@ -250,10 +258,20 @@ export function AvailabilityHeatmap({ participants, tripDateRange, tripDurationD
                     </div>
                     <div className="text-right shrink-0">
                       <p className="text-xs font-bold text-primary">#{index + 1}</p>
+                      {appliedWindowKey === getWindowKey(window) && (
+                        <p className="mt-1 text-[10px] font-semibold text-primary">Selected</p>
+                      )}
                     </div>
                   </button>
                 ))}
               </div>
+              {onApplyWindow && activeWindow && (
+                <div className="mt-3 flex justify-end">
+                  <Button type="button" size="sm" onClick={() => onApplyWindow(activeWindow)}>
+                    Use these dates in Plan
+                  </Button>
+                </div>
+              )}
             </div>
           )}
 
