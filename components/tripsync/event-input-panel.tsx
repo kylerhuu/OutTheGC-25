@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { DateRange } from 'react-day-picker'
-import { Plus, X, Eye, Pencil } from 'lucide-react'
+import { ArrowRight, Plus, X, Eye, Pencil } from 'lucide-react'
 import { Calendar } from '@/components/ui/calendar'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -30,6 +30,14 @@ const INTEREST_OPTIONS = [
   { id: 'adventure', label: 'Adventure' },
   { id: 'nightlife', label: 'Nightlife' },
   { id: 'nature', label: 'Nature' },
+  { id: 'shopping', label: 'Shopping' },
+  { id: 'relaxation', label: 'Relaxation' },
+  { id: 'wellness', label: 'Wellness & Spa' },
+  { id: 'museums', label: 'Museums & History' },
+  { id: 'music', label: 'Live Music' },
+  { id: 'roadtrip', label: 'Road Trip' },
+  { id: 'photography', label: 'Scenic Views' },
+  { id: 'sports', label: 'Sports & Games' },
 ]
 
 const BUDGET_OPTIONS = [
@@ -58,6 +66,7 @@ interface EventInputPanelProps {
   editingParticipant?: ParticipantData | null
   onEditSubmission?: () => void
   onViewCalendar?: () => void
+  onGoToPlanning?: () => void
   savedEditCode?: string | null
 }
 
@@ -70,6 +79,7 @@ export function EventInputPanel({
   editingParticipant,
   onEditSubmission,
   onViewCalendar,
+  onGoToPlanning,
   savedEditCode,
 }: EventInputPanelProps) {
   const [name, setName] = useState('')
@@ -223,7 +233,7 @@ export function EventInputPanel({
           </div>
           <h3 className="text-lg font-semibold text-foreground mb-2">Response Submitted</h3>
           <p className="text-muted-foreground text-sm max-w-xs mb-6">
-            Thanks for sharing! Your preferences are helping plan the perfect trip.
+            You&apos;re in. Next, either check the group results, tweak your response, or jump into planning.
           </p>
 
           {savedEditCode && (
@@ -233,25 +243,35 @@ export function EventInputPanel({
             </div>
           )}
           
-          <div className="flex flex-col sm:flex-row gap-3 w-full max-w-sm">
+          <div className="flex flex-col gap-3 w-full max-w-sm">
+            {onViewCalendar && (
+              <Button
+                variant="default"
+                onClick={onViewCalendar}
+                className="w-full gap-2"
+              >
+                <Eye className="size-4" />
+                View Results
+              </Button>
+            )}
             {onEditSubmission && (
               <Button
                 variant="outline"
                 onClick={onEditSubmission}
-                className="flex-1 gap-2"
+                className="w-full gap-2"
               >
                 <Pencil className="size-4" />
                 Edit My Submission
               </Button>
             )}
-            {onViewCalendar && (
+            {onGoToPlanning && (
               <Button
-                variant="default"
-                onClick={onViewCalendar}
-                className="flex-1 gap-2"
+                variant="outline"
+                onClick={onGoToPlanning}
+                className="w-full gap-2"
               >
-                <Eye className="size-4" />
-                View Calendar
+                <ArrowRight className="size-4" />
+                Go To Planning Page
               </Button>
             )}
           </div>
@@ -271,7 +291,7 @@ export function EventInputPanel({
         <CardDescription className="text-sm text-muted-foreground">
           {isEditMode 
             ? 'Update your availability and preferences below'
-            : 'Tell us when you\'re available and what you\'d like to do'
+            : 'Start with the basics, then pick destinations and the kind of trip you want.'
           }
         </CardDescription>
       </CardHeader>
@@ -326,6 +346,11 @@ export function EventInputPanel({
             )}
           </div>
         )}
+
+        <div className="space-y-1">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Basics</p>
+          <p className="text-xs text-muted-foreground">Who you are, when you&apos;re free, and how to edit later if needed.</p>
+        </div>
 
         {/* Name */}
         <div className="flex flex-col gap-3">
@@ -387,9 +412,14 @@ export function EventInputPanel({
           )}
         </div>
 
+        <div className="space-y-1 border-t border-border/50 pt-1">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Where should the trip be?</p>
+          <p className="text-xs text-muted-foreground">Choose possible destinations for the group, not activities within that place.</p>
+        </div>
+
         {/* Destinations */}
         <div className="flex flex-col gap-3 pt-2">
-          <Label className="text-sm font-medium">Destination Ideas</Label>
+          <Label className="text-sm font-medium">Destination Options</Label>
           <div className="flex flex-wrap gap-2">
             {normalizedDestinationOptions.map(dest => (
               <Badge
@@ -417,7 +447,7 @@ export function EventInputPanel({
           {/* Custom destination input - always visible */}
           <div className="flex gap-2 mt-1">
             <Input
-              placeholder="Add custom destination"
+              placeholder="Add another place to consider"
               value={customDestination}
               onChange={(e) => setCustomDestination(e.target.value)}
               onKeyDown={(e) => {
@@ -442,6 +472,11 @@ export function EventInputPanel({
 
         </div>
 
+        <div className="space-y-1 border-t border-border/50 pt-1">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">What kind of trip do you want?</p>
+          <p className="text-xs text-muted-foreground">Pick the vibe and activities you care about once you get there.</p>
+        </div>
+
         {/* Budget */}
         <div className="flex flex-col gap-3 pt-2">
           <Label className="text-sm font-medium">Budget Range</Label>
@@ -461,7 +496,7 @@ export function EventInputPanel({
 
         {/* Interests */}
         <div className="flex flex-col gap-3 pt-2">
-          <Label className="text-sm font-medium">Trip Interests</Label>
+          <Label className="text-sm font-medium">Trip Vibe & Activities</Label>
           <div className="flex flex-wrap gap-2">
             {INTEREST_OPTIONS.map(interest => (
               <Toggle

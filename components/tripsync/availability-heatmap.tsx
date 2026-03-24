@@ -8,7 +8,6 @@ import type { ParticipantData } from '@/app/event/[tripId]/page'
 interface AvailabilityHeatmapProps {
   participants: ParticipantData[]
   tripDateRange: { from: Date; to: Date }
-  tripDuration: number
 }
 
 interface DayData {
@@ -18,7 +17,7 @@ interface DayData {
   percentage: number
 }
 
-export function AvailabilityHeatmap({ participants, tripDateRange, tripDuration }: AvailabilityHeatmapProps) {
+export function AvailabilityHeatmap({ participants, tripDateRange }: AvailabilityHeatmapProps) {
   // Generate all days in the trip date range with availability counts
   const heatmapData = useMemo(() => {
     const days: DayData[] = []
@@ -95,9 +94,10 @@ export function AvailabilityHeatmap({ participants, tripDateRange, tripDuration 
   }
 
   const dayLabels = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
+  const suggestedDuration = Math.min(4, Math.max(1, heatmapData.length))
 
   const bestWindows = useMemo(() => {
-    if (participants.length === 0 || heatmapData.length === 0 || tripDuration > heatmapData.length) {
+    if (participants.length === 0 || heatmapData.length === 0 || suggestedDuration > heatmapData.length) {
       return []
     }
 
@@ -109,8 +109,8 @@ export function AvailabilityHeatmap({ participants, tripDateRange, tripDuration 
       perfectDays: number
     }> = []
 
-    for (let startIndex = 0; startIndex <= heatmapData.length - tripDuration; startIndex += 1) {
-      const slice = heatmapData.slice(startIndex, startIndex + tripDuration)
+    for (let startIndex = 0; startIndex <= heatmapData.length - suggestedDuration; startIndex += 1) {
+      const slice = heatmapData.slice(startIndex, startIndex + suggestedDuration)
       const totalAvailable = slice.reduce((sum, day) => sum + day.count, 0)
       const perfectDays = slice.filter((day) => day.count === day.total).length
 
@@ -130,7 +130,7 @@ export function AvailabilityHeatmap({ participants, tripDateRange, tripDuration 
         return a.start.getTime() - b.start.getTime()
       })
       .slice(0, 3)
-  }, [heatmapData, participants.length, tripDuration])
+  }, [heatmapData, participants.length, suggestedDuration])
 
   if (participants.length === 0) {
     return (
@@ -161,7 +161,10 @@ export function AvailabilityHeatmap({ participants, tripDateRange, tripDuration 
           {bestWindows.length > 0 && (
             <div className="rounded-xl border border-border/50 bg-muted/30 p-3">
               <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Best {tripDuration}-day windows
+                Best {suggestedDuration}-day windows
+              </p>
+              <p className="mb-3 text-xs text-muted-foreground">
+                Based on the dates people selected inside this trip&apos;s overall date range.
               </p>
               <div className="space-y-2">
                 {bestWindows.map((window, index) => (

@@ -4,7 +4,6 @@ import type { RefObject } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
-import { Slider } from '@/components/ui/slider'
 import { MapPin, DollarSign, Heart, Users } from 'lucide-react'
 import { AvailabilityHeatmap } from '@/components/tripsync/availability-heatmap'
 import { ParticipantDetails } from '@/components/tripsync/participant-details'
@@ -12,8 +11,6 @@ import type { ParticipantData } from '@/app/event/[tripId]/page'
 
 interface EventSummaryPanelProps {
   participants: ParticipantData[]
-  tripDuration: number
-  onDurationChange: (duration: number) => void
   tripDateRange: { from: Date; to: Date }
   selectedParticipantId: string | null
   onSelectParticipant: (id: string | null) => void
@@ -24,8 +21,6 @@ interface EventSummaryPanelProps {
 
 export function EventSummaryPanel({ 
   participants, 
-  tripDuration, 
-  onDurationChange,
   tripDateRange,
   selectedParticipantId,
   onSelectParticipant,
@@ -81,6 +76,14 @@ export function EventSummaryPanel({
     adventure: 'Adventure',
     nightlife: 'Nightlife',
     nature: 'Nature',
+    shopping: 'Shopping',
+    relaxation: 'Relaxation',
+    wellness: 'Wellness & Spa',
+    museums: 'Museums & History',
+    music: 'Live Music',
+    roadtrip: 'Road Trip',
+    photography: 'Scenic Views',
+    sports: 'Sports & Games',
   }
 
   const selectedParticipant = selectedParticipantId 
@@ -139,111 +142,77 @@ export function EventSummaryPanel({
         <AvailabilityHeatmap
           participants={participants}
           tripDateRange={tripDateRange}
-          tripDuration={tripDuration}
         />
       </div>
 
-      {/* Trip Duration */}
-      <Card className="bg-card border-border/60 shadow-sm">
-        <CardHeader className="pb-3.5">
-          <CardTitle className="text-sm font-semibold text-foreground">Trip Duration</CardTitle>
-        </CardHeader>
-        <CardContent className="pt-0">
-          <div className="flex flex-col gap-4">
-            <div className="flex items-baseline gap-2">
-              <span className="text-3xl font-bold text-primary">{tripDuration}</span>
-              <span className="text-muted-foreground text-xs font-medium">days</span>
-            </div>
-            <Slider
-              value={[tripDuration]}
-              onValueChange={(value) => onDurationChange(value[0])}
-              min={3}
-              max={14}
-              step={1}
-              className="[&_[role=slider]]:bg-primary [&_[role=slider]]:border-2 [&_[role=slider]]:border-primary-foreground"
-            />
-            <div className="flex justify-between text-xs text-muted-foreground font-medium">
-              <span>3</span>
-              <span>14</span>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Top Destinations */}
       <Card className="bg-card border-border/60 shadow-sm">
         <CardHeader className="pb-3.5">
           <CardTitle className="text-sm font-semibold flex items-center gap-2 text-foreground">
             <MapPin className="size-4 text-primary" />
-            Top Destinations
+            Group Snapshot
           </CardTitle>
         </CardHeader>
         <CardContent className="pt-0">
-          {sortedDestinations.length === 0 ? (
-            <p className="text-xs text-muted-foreground">No destination votes yet</p>
-          ) : (
+          <div className="flex flex-col gap-5">
             <div className="flex flex-col gap-3">
-              {sortedDestinations.map(([dest, count]) => (
-                <div key={dest} className="flex flex-col gap-1.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-foreground">{dest}</span>
-                    <span className="text-xs font-medium text-primary">{count} {count === 1 ? 'vote' : 'votes'}</span>
-                  </div>
-                  <Progress value={(count / totalParticipants) * 100} className="h-2 rounded-full" />
+              <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                <MapPin className="size-3.5 text-primary" />
+                Destination votes
+              </div>
+              {sortedDestinations.length === 0 ? (
+                <p className="text-xs text-muted-foreground">No destination votes yet</p>
+              ) : (
+                <div className="flex flex-col gap-3">
+                  {sortedDestinations.map(([dest, count]) => (
+                    <div key={dest} className="flex flex-col gap-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-foreground">{dest}</span>
+                        <span className="text-xs font-medium text-primary">{count} {count === 1 ? 'vote' : 'votes'}</span>
+                      </div>
+                      <Progress value={(count / totalParticipants) * 100} className="h-2 rounded-full" />
+                    </div>
+                  ))}
                 </div>
-              ))}
+              )}
             </div>
-          )}
-        </CardContent>
-      </Card>
 
-      {/* Budget Distribution */}
-      <Card className="bg-card border-border/60 shadow-sm">
-        <CardHeader className="pb-3.5">
-          <CardTitle className="text-sm font-semibold flex items-center gap-2 text-foreground">
-            <DollarSign className="size-4 text-primary" />
-            Budget Distribution
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="pt-0">
-          {Object.keys(budgetCounts).length === 0 ? (
-            <p className="text-xs text-muted-foreground">No budget responses yet</p>
-          ) : (
-            <div className="flex flex-col gap-2.5">
-              {Object.entries(budgetCounts).map(([budget, count]) => (
-                <div key={budget} className="flex items-center justify-between">
-                  <span className="text-xs font-medium text-foreground">{budgetLabels[budget] || budget}</span>
-                  <Badge variant="secondary" className="text-xs font-medium">
-                    {count}
-                  </Badge>
+            <div className="flex flex-col gap-3 border-t border-border/40 pt-4">
+              <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                <DollarSign className="size-3.5 text-primary" />
+                Budget
+              </div>
+              {Object.keys(budgetCounts).length === 0 ? (
+                <p className="text-xs text-muted-foreground">No budget responses yet</p>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {Object.entries(budgetCounts).map(([budget, count]) => (
+                    <Badge key={budget} variant="secondary" className="text-xs font-medium">
+                      {budgetLabels[budget] || budget} · {count}
+                    </Badge>
+                  ))}
                 </div>
-              ))}
+              )}
             </div>
-          )}
-        </CardContent>
-      </Card>
 
-      {/* Interests */}
-      <Card className="bg-card border-border/60 shadow-sm">
-        <CardHeader className="pb-3.5">
-          <CardTitle className="text-sm font-semibold flex items-center gap-2 text-foreground">
-            <Heart className="size-4 text-primary" />
-            Top Interests
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="pt-0">
-          {sortedInterests.length === 0 ? (
-            <p className="text-xs text-muted-foreground">No interest responses yet</p>
-          ) : (
-            <div className="flex flex-wrap gap-2">
-              {sortedInterests.map(([interest, count]) => (
-                <Badge key={interest} variant="outline" className="gap-1.5 text-xs font-medium bg-primary/5 text-primary border-primary/20 hover:border-primary/40">
-                  {interestLabels[interest] || interest}
-                  <span className="font-semibold">{count}</span>
-                </Badge>
-              ))}
+            <div className="flex flex-col gap-3 border-t border-border/40 pt-4">
+              <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                <Heart className="size-3.5 text-primary" />
+                Trip vibe
+              </div>
+              {sortedInterests.length === 0 ? (
+                <p className="text-xs text-muted-foreground">No activity preferences yet</p>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {sortedInterests.map(([interest, count]) => (
+                    <Badge key={interest} variant="outline" className="gap-1.5 text-xs font-medium bg-primary/5 text-primary border-primary/20 hover:border-primary/40">
+                      {interestLabels[interest] || interest}
+                      <span className="font-semibold">{count}</span>
+                    </Badge>
+                  ))}
+                </div>
+              )}
             </div>
-          )}
+          </div>
         </CardContent>
       </Card>
     </div>

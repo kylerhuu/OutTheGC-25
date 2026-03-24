@@ -1,7 +1,7 @@
 "use client"
 
-import { useMemo, useState } from "react"
-import { X } from "lucide-react"
+import { useEffect, useMemo, useState } from "react"
+import { ExternalLink, RotateCcw, X } from "lucide-react"
 import { CopyButton } from "@/components/tripsync/copy-button"
 import { OutTheGCLogo } from "@/components/tripsync/outthegc-logo"
 import type { TripRecord } from "@/lib/trip-types"
@@ -10,6 +10,21 @@ interface CreateTripModalProps {
   open: boolean
   onClose: () => void
 }
+
+interface TripDraft {
+  tripName: string
+  startDate: string
+  endDate: string
+  description: string
+}
+
+interface RecentTripLink {
+  tripName: string
+  link: string
+}
+
+const TRIP_DRAFT_KEY = "outthegc:create-trip-draft"
+const RECENT_TRIP_KEY = "outthegc:recent-trip-link"
 
 export function CreateTripModal({ open, onClose }: CreateTripModalProps) {
   const [tripName, setTripName] = useState("")
@@ -20,10 +35,74 @@ export function CreateTripModal({ open, onClose }: CreateTripModalProps) {
   const [link, setLink] = useState("")
   const [isGenerating, setIsGenerating] = useState(false)
   const [errorMessage, setErrorMessage] = useState("")
+  const [restorableDraft, setRestorableDraft] = useState<TripDraft | null>(null)
+  const [recentTrip, setRecentTrip] = useState<RecentTripLink | null>(null)
 
   const today = useMemo(() => new Date().toISOString().split("T")[0], [])
 
+  const hasDraftContent = Boolean(tripName || startDate || endDate || description)
+
+  useEffect(() => {
+    if (!open || typeof window === "undefined") return
+
+    const savedDraftRaw = window.localStorage.getItem(TRIP_DRAFT_KEY)
+    if (savedDraftRaw && !hasDraftContent && !generated) {
+      try {
+        setRestorableDraft(JSON.parse(savedDraftRaw) as TripDraft)
+      } catch {
+        window.localStorage.removeItem(TRIP_DRAFT_KEY)
+      }
+    }
+
+    const recentTripRaw = window.localStorage.getItem(RECENT_TRIP_KEY)
+    if (recentTripRaw) {
+      try {
+        setRecentTrip(JSON.parse(recentTripRaw) as RecentTripLink)
+      } catch {
+        window.localStorage.removeItem(RECENT_TRIP_KEY)
+      }
+    }
+  }, [generated, hasDraftContent, open])
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !open || generated) return
+
+    if (!hasDraftContent) {
+      window.localStorage.removeItem(TRIP_DRAFT_KEY)
+      return
+    }
+
+    const draft: TripDraft = {
+      tripName,
+      startDate,
+      endDate,
+      description,
+    }
+
+    window.localStorage.setItem(TRIP_DRAFT_KEY, JSON.stringify(draft))
+  }, [description, endDate, generated, hasDraftContent, open, startDate, tripName])
+
   if (!open) return null
+
+  function clearDraftState() {
+    setTripName("")
+    setStartDate("")
+    setEndDate("")
+    setDescription("")
+    setRestorableDraft(null)
+    if (typeof window !== "undefined") {
+      window.localStorage.removeItem(TRIP_DRAFT_KEY)
+    }
+  }
+
+  function restoreDraft() {
+    if (!restorableDraft) return
+    setTripName(restorableDraft.tripName)
+    setStartDate(restorableDraft.startDate)
+    setEndDate(restorableDraft.endDate)
+    setDescription(restorableDraft.description)
+    setRestorableDraft(null)
+  }
 
   async function handleGenerate(e: React.FormEvent) {
     e.preventDefault()
@@ -57,8 +136,19 @@ export function CreateTripModal({ open, onClose }: CreateTripModalProps) {
       }
 
       const origin = window.location.origin
-      setLink(`${origin}/event/${data.trip.id}`)
+      const nextLink = `${origin}/event/${data.trip.id}`
+      setLink(nextLink)
       setGenerated(true)
+      setRecentTrip({ tripName: data.trip.name, link: nextLink })
+      window.localStorage.removeItem(TRIP_DRAFT_KEY)
+      window.localStorage.setItem(
+        RECENT_TRIP_KEY,
+        JSON.stringify({
+          tripName: data.trip.name,
+          link: nextLink,
+        }),
+      )
+      setRestorableDraft(null)
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Unable to create trip.")
     } finally {
@@ -67,12 +157,6 @@ export function CreateTripModal({ open, onClose }: CreateTripModalProps) {
   }
 
   function handleClose() {
-    setGenerated(false)
-    setTripName("")
-    setStartDate("")
-    setEndDate("")
-    setDescription("")
-    setLink("")
     setErrorMessage("")
     setIsGenerating(false)
     onClose()
@@ -109,6 +193,52 @@ export function CreateTripModal({ open, onClose }: CreateTripModalProps) {
                 <p className="text-sm text-muted-foreground">Takes 30 seconds</p>
               </div>
             </div>
+
+            {restorableDraft && (
+              <div className="mb-5 rounded-xl border border-primary/15 bg-primary/5 p-4">
+                <p className="text-sm font-semibold text-foreground">Restore your draft?</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  We saved your trip details so you don&apos;t lose them if the modal closes.
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={restoreDraft}
+                    className="rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground"
+                  >
+                    Restore draft
+                  </button>
+                  <button
+                    type="button"
+                    onClick={clearDraftState}
+                    className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-foreground"
+                  >
+                    Start fresh
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {!restorableDraft && recentTrip && !hasDraftContent && (
+              <div className="mb-5 rounded-xl border border-border/60 bg-muted/30 p-4">
+                <p className="text-sm font-semibold text-foreground">Recent trip link</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {recentTrip.tripName || "Your last trip"} is still ready if you need to copy or reopen it.
+                </p>
+                <div className="mt-3 flex items-center gap-2 rounded-lg bg-background px-3 py-2">
+                  <span className="min-w-0 flex-1 truncate font-mono text-xs text-foreground">{recentTrip.link}</span>
+                  <CopyButton textToCopy={recentTrip.link} className="h-8 px-3 py-0 text-xs" />
+                  <button
+                    type="button"
+                    onClick={() => window.open(recentTrip.link, "_self")}
+                    className="inline-flex h-8 items-center gap-1 rounded-lg border border-border px-3 text-xs font-semibold text-foreground"
+                  >
+                    <ExternalLink className="size-3.5" />
+                    Open
+                  </button>
+                </div>
+              </div>
+            )}
 
             <form onSubmit={handleGenerate} className="flex flex-col gap-5">
               <div className="flex flex-col gap-1.5">
@@ -191,11 +321,33 @@ export function CreateTripModal({ open, onClose }: CreateTripModalProps) {
               <span className="text-sm text-foreground font-mono truncate">{link}</span>
               <CopyButton textToCopy={link} className="h-8 px-3 py-0 text-xs" />
             </div>
+            <div className="grid w-full gap-3 sm:grid-cols-2">
+              <button
+                type="button"
+                onClick={() => window.open(link, "_self")}
+                className="w-full bg-primary text-primary-foreground rounded-xl py-3 text-sm font-semibold hover:opacity-90 active:scale-[0.98] transition-all"
+              >
+                Open trip page
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setGenerated(false)
+                  setLink("")
+                  clearDraftState()
+                }}
+                className="w-full rounded-xl border border-border py-3 text-sm font-semibold text-foreground hover:bg-muted transition-colors"
+              >
+                Create another
+              </button>
+            </div>
             <button
+              type="button"
               onClick={handleClose}
-              className="w-full bg-primary text-primary-foreground rounded-xl py-3 text-sm font-semibold hover:opacity-90 active:scale-[0.98] transition-all"
+              className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
             >
-              Done
+              <RotateCcw className="size-4" />
+              Close and reopen later
             </button>
           </div>
         )}

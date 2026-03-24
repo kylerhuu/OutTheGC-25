@@ -48,6 +48,14 @@ const INTEREST_LABELS: Record<string, string> = {
   adventure: 'Adventure',
   nightlife: 'Nightlife',
   nature: 'Nature',
+  shopping: 'Shopping',
+  relaxation: 'Relaxation',
+  wellness: 'Wellness & Spa',
+  museums: 'Museums & History',
+  music: 'Live Music',
+  roadtrip: 'Road Trip',
+  photography: 'Scenic Views',
+  sports: 'Sports & Games',
 }
 
 const SECTION_PLACEHOLDERS = {

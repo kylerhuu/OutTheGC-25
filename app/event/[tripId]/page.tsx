@@ -93,7 +93,6 @@ export default function EventPage() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [tripAccess, setTripAccess] = useState<TripAccess | null>(null)
   const [hasSubmitted, setHasSubmitted] = useState(false)
-  const [tripDuration, setTripDuration] = useState(7)
   const [selectedParticipantId, setSelectedParticipantId] = useState<string | null>(null)
   const [editingParticipant, setEditingParticipant] = useState<ParticipantData | null>(null)
   const [savedEditCode, setSavedEditCode] = useState<string | null>(null)
@@ -276,6 +275,10 @@ export default function EventPage() {
     availabilitySectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }, [participants])
 
+  const handleGoToPlanning = useCallback(() => {
+    window.location.href = `/plan/${tripId}`
+  }, [tripId])
+
   const shareUrl = useMemo(() => {
     if (typeof window === 'undefined') {
       return `${process.env.NEXT_PUBLIC_BASE_URL || 'https://outthegc.app'}/event/${tripId}`
@@ -348,6 +351,7 @@ export default function EventPage() {
                 editingParticipant={editingParticipant}
                 onEditSubmission={currentUserId ? () => handleEditSubmission(currentUserId) : undefined}
                 onViewCalendar={handleViewCalendar}
+                onGoToPlanning={handleGoToPlanning}
                 savedEditCode={savedEditCode}
               />
             </div>
@@ -356,8 +360,6 @@ export default function EventPage() {
             <div className="lg:col-span-2">
               <EventSummaryPanel
                 participants={participants}
-                tripDuration={tripDuration}
-                onDurationChange={setTripDuration}
                 tripDateRange={{ from: new Date(trip.startDate), to: new Date(trip.endDate) }}
                 selectedParticipantId={selectedParticipantId}
                 onSelectParticipant={setSelectedParticipantId}
