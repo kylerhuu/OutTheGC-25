@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { CalendarDays, CheckSquare, Loader2, MapPinned, NotebookPen, PlaneTakeoff } from 'lucide-react'
 import { EventTopBar } from '@/components/tripsync/event-top-bar'
+import { FinalDocTab } from '@/components/tripsync/final-doc-tab'
 import { TripIdeasTab, type IdeaGroupKey } from '@/components/tripsync/trip-ideas-tab'
 import { TripSnapshot } from '@/components/tripsync/trip-snapshot'
 import { Badge } from '@/components/ui/badge'
@@ -79,7 +80,7 @@ export default function PlanPage() {
   const [todoError, setTodoError] = useState<string | null>(null)
   const [isAddingTodo, setIsAddingTodo] = useState(false)
   const [busyTodoId, setBusyTodoId] = useState<string | null>(null)
-  const [activePlannerTab, setActivePlannerTab] = useState<'ideas' | 'plan'>('plan')
+  const [activePlannerTab, setActivePlannerTab] = useState<'ideas' | 'plan' | 'final-doc'>('plan')
   const [highlightedPlanField, setHighlightedPlanField] = useState<keyof UpdateTripPlanInput | null>(null)
 
   const loadPlan = useCallback(async () => {
@@ -412,7 +413,7 @@ export default function PlanPage() {
         <TripSnapshot trip={data.trip} plan={data.plan} />
 
         <div className="inline-flex w-fit items-center rounded-2xl border border-border bg-muted/40 p-1 shadow-sm">
-          {(['ideas', 'plan'] as const).map((tab) => (
+          {(['ideas', 'plan', 'final-doc'] as const).map((tab) => (
             <button
               key={tab}
               type="button"
@@ -423,13 +424,15 @@ export default function PlanPage() {
                   : 'text-muted-foreground hover:bg-background hover:text-foreground'
               }`}
             >
-              {tab === 'ideas' ? 'Ideas' : 'Plan'}
+              {tab === 'ideas' ? 'Ideas' : tab === 'plan' ? 'Plan' : 'Final Doc'}
             </button>
           ))}
         </div>
 
         {activePlannerTab === 'ideas' ? (
           <TripIdeasTab onAddToPlan={handleAddIdeaToPlan} />
+        ) : activePlannerTab === 'final-doc' ? (
+          <FinalDocTab trip={data.trip} plan={data.plan} />
         ) : (
         <Card className="border-border/60 bg-card shadow-sm">
           <CardHeader className="pb-4">
