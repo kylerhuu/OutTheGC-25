@@ -218,4 +218,44 @@
   .pulse-glow {
     animation: pulse-glow 2s infinite;
   }
+
+  /* Animated background motions */
+  @keyframes float-slow {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-20px); }
+  }
+
+  @keyframes float-subtle {
+    0%, 100% { transform: translateY(0px) translateX(0px); }
+    50% { transform: translateY(-15px) translateX(-10px); }
+  }
+
+  @keyframes pan {
+    0%, 100% { transform: translateX(0px); }
+    50% { transform: translateX(20px); }
+  }
+
+  @keyframes travelPath1 {
+    0% { cx: 0; cy: 200; }
+    25% { cx: 300; cy: 150; }
+    50% { cx: 600; cy: 200; }
+    75% { cx: 900; cy: 150; }
+    100% { cx: 1200; cy: 200; }
+  }
+
+  @keyframes travelPath2 {
+    0% { cx: 1200; cy: 600; }
+    25% { cx: 900; cy: 650; }
+    50% { cx: 600; cy: 600; }
+    75% { cx: 300; cy: 650; }
+    100% { cx: 0; cy: 600; }
+  }
+
+  .animate-float-slow {
+    animation: float-slow 12s ease-in-out infinite;
+  }
+
+  .animate-pan {
+    animation: pan 20s ease-in-out infinite;
+  }
 }
