@@ -48,19 +48,11 @@ export async function POST(request: Request) {
       },
       body: JSON.stringify({
         model: process.env.OPENAI_IDEAS_MODEL || 'gpt-4o-mini',
-        input: [
-          {
-            role: 'system',
-            content:
-              body.mode === 'build_itinerary'
-                ? 'You turn trip notes into a useful planning output. Return only structured JSON. Preserve any existing day-based or section-based structure in preservedSections. Also create suggestedItinerary as a realistic day-by-day trip draft when the user input is broad or unordered. If the user already has a strong itinerary, keep that intent and lightly refine it instead of replacing it. Keep wording close to the user input, but clean obvious clutter. Put each item in exactly one category: stays, places, food, transport, or misc. notesSummary should be 1-2 short sentences that summarize the trip ideas without inventing details.'
-                : 'You organize messy trip-planning notes into categories while preserving useful structure. Return only structured JSON. Keep wording close to the user input, but clean obvious clutter. If the user already organized notes by day, section, or ordered outline, preserve that structure in preservedSections instead of flattening it. Split combined notes into separate concise items when helpful. Put each item in exactly one category: stays, places, food, transport, or misc. For organize mode, suggestedItinerary should be an empty array unless the user already provided a clear itinerary. notesSummary should be 1-2 short sentences that summarize the trip ideas without inventing details.',
-          },
-          {
-            role: 'user',
-            content: body.text,
-          },
-        ],
+        instructions:
+          body.mode === 'build_itinerary'
+            ? 'You turn trip notes into a useful planning output. Return only structured JSON. Preserve any existing day-based or section-based structure in preservedSections. Also create suggestedItinerary as a realistic day-by-day trip draft when the user input is broad or unordered. If the user already has a strong itinerary, keep that intent and lightly refine it instead of replacing it. Keep wording close to the user input, but clean obvious clutter. Put each item in exactly one category: stays, places, food, transport, or misc. notesSummary should be 1-2 short sentences that summarize the trip ideas without inventing details.'
+            : 'You organize messy trip-planning notes into categories while preserving useful structure. Return only structured JSON. Keep wording close to the user input, but clean obvious clutter. If the user already organized notes by day, section, or ordered outline, preserve that structure in preservedSections instead of flattening it. Split combined notes into separate concise items when helpful. Put each item in exactly one category: stays, places, food, transport, or misc. For organize mode, suggestedItinerary should be an empty array unless the user already provided a clear itinerary. notesSummary should be 1-2 short sentences that summarize the trip ideas without inventing details.',
+        input: body.text,
         text: {
           format: {
             type: 'json_schema',
@@ -151,7 +143,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: refusal }, { status: 400 })
     }
 
-    const outputText = extractOutputText(payload)
+    const outputText =
+      (typeof payload?.output_text === 'string' ? payload.output_text : null) ??
+      extractOutputText(payload)
     if (!outputText) {
       return NextResponse.json(
         { error: 'OpenAI returned no structured output.' },
