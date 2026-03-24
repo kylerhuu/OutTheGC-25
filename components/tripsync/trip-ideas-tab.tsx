@@ -620,7 +620,7 @@ function LiveDraftPanel({
       : turn?.preservedSections ?? []
 
   return (
-          <div className="rounded-[28px] border border-border/60 bg-background shadow-sm">
+    <div className="rounded-[28px] border border-border/60 bg-background shadow-sm">
       <div className="border-b border-border/50 px-6 py-5">
         <p className="text-sm font-semibold text-foreground">Current Draft</p>
         <p className="text-xs text-muted-foreground">Live itinerary preview on the right.</p>
@@ -636,28 +636,28 @@ function LiveDraftPanel({
           </div>
         </div>
       ) : (
-        <div className="space-y-6 p-6">
-          <div className="space-y-3">
+        <article className="space-y-8 p-6">
+          <header className="border-b border-border/50 pb-6">
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant="secondary">Latest reply</Badge>
               {turn.detectedStructure && <Badge variant="outline">{formatStructureLabel(turn.detectedStructure)}</Badge>}
             </div>
-            <p className="text-2xl font-semibold leading-tight text-foreground">Trip draft</p>
-            <p className="text-sm leading-6 text-muted-foreground">
+            <h2 className="mt-4 text-3xl font-semibold tracking-tight text-foreground">Trip draft</h2>
+            <p className="mt-3 max-w-2xl text-base leading-7 text-muted-foreground">
               {turn.notesSummary || turn.text}
             </p>
-          </div>
+          </header>
 
-          <div className="space-y-5 border-t border-border/50 pt-5">
+          <section className="space-y-5">
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Preview</p>
             {previewSections.length === 0 ? (
-              <p className="text-sm text-muted-foreground">The latest reply did not include a structured draft yet.</p>
+              <p className="text-base leading-7 text-muted-foreground">The latest reply did not include a structured draft yet.</p>
             ) : (
-              <div className="space-y-7">
+              <div className="space-y-8">
                 {previewSections.map((section) => (
-                  <section key={`${turn.id}-${section.title}`} className="space-y-2.5">
-                    <h3 className="text-lg font-semibold text-foreground">{section.title}</h3>
-                    <ul className="space-y-2 text-sm leading-6 text-muted-foreground">
+                  <section key={`${turn.id}-${section.title}`} className="space-y-3">
+                    <h3 className="text-2xl font-semibold tracking-tight text-foreground">{section.title}</h3>
+                    <ul className="space-y-2.5 text-base leading-7 text-foreground">
                       {section.items.map((item) => (
                         <li key={`${section.title}-${item}`} className="flex gap-3">
                           <span className="mt-[9px] size-1.5 rounded-full bg-primary/70" />
@@ -669,10 +669,10 @@ function LiveDraftPanel({
                 ))}
               </div>
             )}
-          </div>
+          </section>
 
           {hasOrganizedIdeas && turn.organizedIdeas && (
-            <div className="space-y-4 border-t border-border/50 pt-5">
+            <section className="space-y-4 border-t border-border/50 pt-6">
               <div className="flex flex-wrap items-center gap-2">
                 <Button
                   type="button"
@@ -753,9 +753,9 @@ function LiveDraftPanel({
                   </div>
                 ))}
               </div>
-            </div>
+            </section>
           )}
-        </div>
+        </article>
       )}
     </div>
   )
