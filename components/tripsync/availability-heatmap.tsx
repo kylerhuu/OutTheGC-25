@@ -237,7 +237,7 @@ export function AvailabilityHeatmap({
                   <button
                     key={`${window.start.toISOString()}-${window.end.toISOString()}`}
                     className={`w-full flex cursor-pointer items-start justify-between gap-3 rounded-lg border px-3 py-2.5 transition-all duration-150 ease-out ${
-                      activeWindowKey === getWindowKey(window)
+                      appliedWindowKey === getWindowKey(window) || activeWindowKey === getWindowKey(window)
                         ? 'border-primary/60 bg-primary/12 ring-2 ring-primary/20 -translate-y-px shadow-sm'
                         : 'border-transparent bg-muted/30 hover:bg-muted/60 hover:-translate-y-px hover:shadow-sm'
                     }`}
@@ -245,9 +245,8 @@ export function AvailabilityHeatmap({
                     onMouseLeave={() => setActiveWindowKey(null)}
                     onClick={() => {
                       setShowCalendar(true)
-                      setActiveWindowKey((current) =>
-                        current === getWindowKey(window) ? null : getWindowKey(window),
-                      )
+                      setActiveWindowKey(getWindowKey(window))
+                      onApplyWindow?.(window)
                     }}
                   >
                     <div className="text-left">
@@ -257,21 +256,13 @@ export function AvailabilityHeatmap({
                       <p className="text-xs text-muted-foreground mt-1">{window.minAvailable}/{participants.length} available · {suggestedDuration}-day trip</p>
                     </div>
                     <div className="text-right shrink-0">
-                      <p className="text-xs font-bold text-primary">#{index + 1}</p>
-                      {appliedWindowKey === getWindowKey(window) && (
-                        <p className="mt-1 text-[10px] font-semibold text-primary">Selected</p>
-                      )}
+                      <p className="text-xs font-bold text-primary">
+                        {appliedWindowKey === getWindowKey(window) ? 'Selected' : `#${index + 1}`}
+                      </p>
                     </div>
                   </button>
                 ))}
               </div>
-              {onApplyWindow && activeWindow && (
-                <div className="mt-3 flex justify-end">
-                  <Button type="button" size="sm" onClick={() => onApplyWindow(activeWindow)}>
-                    Use these dates in Plan
-                  </Button>
-                </div>
-              )}
             </div>
           )}
 
