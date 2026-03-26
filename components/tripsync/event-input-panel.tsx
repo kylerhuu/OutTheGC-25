@@ -19,7 +19,6 @@ import {
 } from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
 import { Spinner } from '@/components/ui/spinner'
-import type { ParticipantData } from '@/app/event/[tripId]/page'
 
 const INTEREST_OPTIONS = [
   { id: 'beach', label: 'Beach' },
@@ -74,6 +73,18 @@ interface EventInputPanelProps {
   onViewResults?: () => void
   onGoToPlanning?: () => void
   savedEditCode?: string | null
+}
+
+interface ParticipantData {
+  id: string
+  name: string
+  availability: { from: Date; to: Date } | null
+  unavailableRanges: Array<{ from: Date; to: Date }>
+  destinations: string[]
+  budget: string
+  interests: string[]
+  notes: string
+  submittedAt: Date
 }
 
 export function EventInputPanel({ 
@@ -148,14 +159,34 @@ export function EventInputPanel({
   // Populate form when editing
   useEffect(() => {
     if (editingParticipant) {
-      setName(editingParticipant.name)
-      setAvailability(
-        editingParticipant.availability 
-          ? { from: editingParticipant.availability.from, to: editingParticipant.availability.to }
+      const safeAvailability =
+        editingParticipant.availability?.from && editingParticipant.availability?.to
+          ? {
+              from: new Date(editingParticipant.availability.from),
+              to: new Date(editingParticipant.availability.to),
+            }
           : undefined
-      )
-      setUnavailableRanges(editingParticipant.unavailableRanges.map((range) => ({ from: range.from, to: range.to })))
-      setDestinations(editingParticipant.destinations)
+
+      const safeUnavailableRanges = editingParticipant.unavailableRanges
+        .filter((range) => range.from && range.to)
+        .map((range) => ({
+          from: new Date(range.from),
+          to: new Date(range.to),
+        }))
+        .filter(
+          (range) =>
+            !Number.isNaN(range.from.getTime()) &&
+            !Number.isNaN(range.to.getTime()) &&
+            range.from.getTime() <= range.to.getTime(),
+        )
+
+      setName(editingParticipant.name)
+      setAvailability(safeAvailability)
+      setUnavailableRanges(safeUnavailableRanges)
+      setBlockedDraftRange(undefined)
+      setBlockedAnchorDate(null)
+      setIsAddingBlockedDates(false)
+      setDestinations([...editingParticipant.destinations])
       setBudget(editingParticipant.budget)
       setInterests(editingParticipant.interests.map(resolveInterestValue))
       setNotes(editingParticipant.notes || '')
