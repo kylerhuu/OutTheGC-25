@@ -334,6 +334,23 @@ export function EventInputPanel({
   }
 
   const isValid = name.trim().length > 0
+  const isEditMode = !!editingParticipant
+
+  const blockedRangeModifiers = useMemo(
+    () =>
+      unavailableRanges
+        .filter((range) => range.from && range.to)
+        .map((range) => ({ from: range.from!, to: range.to! })),
+    [unavailableRanges],
+  )
+
+  const blockedDraftModifiers = useMemo(
+    () =>
+      blockedDraftRange?.from && blockedDraftRange?.to
+        ? [{ from: blockedDraftRange.from, to: blockedDraftRange.to }]
+        : [],
+    [blockedDraftRange],
+  )
 
   // Post-submission state with action buttons
   if (hasSubmitted && !editingParticipant) {
@@ -394,16 +411,6 @@ export function EventInputPanel({
     )
   }
 
-  const isEditMode = !!editingParticipant
-
-  const blockedRangeModifiers = useMemo(
-    () =>
-      unavailableRanges
-        .filter((range) => range.from && range.to)
-        .map((range) => ({ from: range.from!, to: range.to! })),
-    [unavailableRanges],
-  )
-
   const addUnavailableRange = (range: DateRange) => {
     if (!range.from || !range.to) return
 
@@ -448,14 +455,6 @@ export function EventInputPanel({
     setBlockedAnchorDate(null)
     setBlockedDraftRange(undefined)
   }
-
-  const blockedDraftModifiers = useMemo(
-    () =>
-      blockedDraftRange?.from && blockedDraftRange?.to
-        ? [{ from: blockedDraftRange.from, to: blockedDraftRange.to }]
-        : [],
-    [blockedDraftRange],
-  )
 
   const handleAvailabilityCalendarSelect = (range: DateRange | undefined) => {
     if (isAddingBlockedDates) return
