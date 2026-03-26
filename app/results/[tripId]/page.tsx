@@ -147,7 +147,9 @@ export default function ResultsPage() {
       setTrip(tripData.trip)
       const nextParticipants = tripData.trip.responses.map(responseToParticipant)
       setParticipants(nextParticipants)
-      setSelectedParticipantId((current) => current ?? nextParticipants[0]?.id ?? null)
+      setSelectedParticipantId((current) =>
+        current && nextParticipants.some((participant) => participant.id === current) ? current : null,
+      )
       setPlan(planResponse.ok && planData.plan ? planData.plan : null)
     } catch (error) {
       setLoadError(error instanceof Error ? error.message : 'Unable to load trip results.')

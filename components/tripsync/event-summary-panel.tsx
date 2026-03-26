@@ -79,7 +79,9 @@ export function EventSummaryPanel({
               {participants.map((participant) => (
                 <button
                   key={participant.id}
-                  onClick={() => onSelectParticipant(participant.id)}
+                  onClick={() =>
+                    onSelectParticipant(selectedParticipantId === participant.id ? null : participant.id)
+                  }
                   className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full border transition-all duration-150 ease-out ${
                     selectedParticipantId === participant.id
                       ? 'bg-primary text-primary-foreground border-primary shadow-md ring-2 ring-primary/30 -translate-y-px'
