@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
-import { parseComparableDate } from '@/lib/date-utils'
+import { parseComparableDate, toDateOnlyString } from '@/lib/date-utils'
+import { getBestAvailabilitySpans, getBestDateWindows, getTripLengthDays } from '@/lib/availability'
 import type {
   CreateResponseInput,
   CreateTripInput,
@@ -31,6 +32,62 @@ function normalizeInterestName(value: string) {
 
 function normalizeDate(value: string) {
   return parseComparableDate(value)
+}
+
+function isDateWithinUnavailableRanges(
+  date: Date,
+  unavailableRanges: Array<{ startDate: string; endDate: string }> | undefined,
+) {
+  return (unavailableRanges ?? []).some((range) => {
+    const start = normalizeDate(range.startDate)
+    const end = normalizeDate(range.endDate)
+    return date >= start && date <= end
+  })
+}
+
+function normalizeUnavailableRanges(
+  unavailableRanges: Array<{ startDate: string; endDate: string }> | undefined,
+) {
+  const normalized = (unavailableRanges ?? [])
+    .map((range) => ({
+      startDate: range.startDate.trim(),
+      endDate: range.endDate.trim(),
+    }))
+    .filter((range) => range.startDate && range.endDate)
+
+  normalized.sort((a, b) => normalizeDate(a.startDate).getTime() - normalizeDate(b.startDate).getTime())
+
+  const merged: Array<{ startDate: string; endDate: string }> = []
+
+  for (const range of normalized) {
+    const currentStart = normalizeDate(range.startDate)
+    const currentEnd = normalizeDate(range.endDate)
+    const previous = merged[merged.length - 1]
+
+    if (!previous) {
+      merged.push({
+        startDate: toDateOnlyString(currentStart),
+        endDate: toDateOnlyString(currentEnd),
+      })
+      continue
+    }
+
+    const previousStart = normalizeDate(previous.startDate)
+    const previousEnd = normalizeDate(previous.endDate)
+
+    if (currentStart.getTime() <= previousEnd.getTime() + 24 * 60 * 60 * 1000) {
+      const nextEnd = new Date(Math.max(previousEnd.getTime(), currentEnd.getTime()))
+      previous.startDate = toDateOnlyString(previousStart)
+      previous.endDate = toDateOnlyString(nextEnd)
+    } else {
+      merged.push({
+        startDate: toDateOnlyString(currentStart),
+        endDate: toDateOnlyString(currentEnd),
+      })
+    }
+  }
+
+  return merged
 }
 
 function normalizeList(items: string[] | undefined) {
@@ -100,6 +157,7 @@ function mapResponseRecord(response: {
   editCode: string
   availabilityStart: string | null
   availabilityEnd: string | null
+  unavailableRanges?: Array<{ startDate: string; endDate: string }>
   destinations: string[]
   budget: string
   interests: string[]
@@ -114,6 +172,10 @@ function mapResponseRecord(response: {
     editCode: response.editCode,
     availabilityStart: response.availabilityStart,
     availabilityEnd: response.availabilityEnd,
+    unavailableRanges: response.unavailableRanges?.map((range) => ({
+      startDate: range.startDate,
+      endDate: range.endDate,
+    })) ?? [],
     destinations: response.destinations,
     budget: response.budget,
     interests: response.interests,
@@ -129,6 +191,7 @@ function mapPublicResponseRecord(response: {
   name: string
   availabilityStart: string | null
   availabilityEnd: string | null
+  unavailableRanges?: Array<{ startDate: string; endDate: string }>
   destinations: string[]
   budget: string
   interests: string[]
@@ -142,6 +205,10 @@ function mapPublicResponseRecord(response: {
     name: response.name,
     availabilityStart: response.availabilityStart,
     availabilityEnd: response.availabilityEnd,
+    unavailableRanges: response.unavailableRanges?.map((range) => ({
+      startDate: range.startDate,
+      endDate: range.endDate,
+    })) ?? [],
     destinations: response.destinations,
     budget: response.budget,
     interests: response.interests,
@@ -167,6 +234,7 @@ function mapTripWithResponses(trip: {
     editCode: string
     availabilityStart: string | null
     availabilityEnd: string | null
+    unavailableRanges?: Array<{ startDate: string; endDate: string }>
     destinations: string[]
     budget: string
     interests: string[]
@@ -268,77 +336,51 @@ function countLabels(items: string[]) {
 }
 
 function getDateWindowSuggestions(trip: TripWithResponses): TripPlanSuggestions['bestDateWindows'] {
-  const tripStart = normalizeDate(trip.startDate)
-  const tripEnd = normalizeDate(trip.endDate)
   const totalParticipants = trip.responses.length
 
   if (totalParticipants === 0) {
     return []
   }
 
-  const daysInRange = Math.max(
-    1,
-    Math.floor((tripEnd.getTime() - tripStart.getTime()) / (1000 * 60 * 60 * 24)) + 1,
+  const duration = Math.min(4, getTripLengthDays(trip.startDate, trip.endDate))
+
+  return getBestDateWindows(
+    trip.responses,
+    { startDate: trip.startDate, endDate: trip.endDate },
+    duration,
+  ).map((window) => ({
+    startDate: window.startDate,
+    endDate: window.endDate,
+    averageAvailable: window.averageAvailable,
+    perfectDays: window.minAvailable === totalParticipants ? duration : 0,
+  }))
+}
+
+function getSuggestedDurationDays(trip: TripWithResponses) {
+  const tripLength = Math.min(4, getTripLengthDays(trip.startDate, trip.endDate))
+  const bestSpans = getBestAvailabilitySpans(trip.responses, {
+    startDate: trip.startDate,
+    endDate: trip.endDate,
+  })
+
+  if (bestSpans.length === 0) {
+    return tripLength
+  }
+
+  const longestBestSpan = Math.max(
+    ...bestSpans.map((span) => getTripLengthDays(span.startDate, span.endDate)),
   )
-  const duration = Math.min(4, daysInRange)
-  const dayCounts: Array<{ date: Date; count: number }> = []
-  const cursor = new Date(tripStart)
 
-  while (cursor <= tripEnd) {
-    const date = new Date(cursor)
-    date.setHours(0, 0, 0, 0)
-
-    const count = trip.responses.filter((response) => {
-      if (!response.availabilityStart || !response.availabilityEnd) return false
-      const availableFrom = new Date(response.availabilityStart)
-      const availableTo = new Date(response.availabilityEnd)
-      availableFrom.setHours(0, 0, 0, 0)
-      availableTo.setHours(23, 59, 59, 999)
-      return date >= availableFrom && date <= availableTo
-    }).length
-
-    dayCounts.push({ date, count })
-    cursor.setDate(cursor.getDate() + 1)
-  }
-
-  const windows: TripPlanSuggestions['bestDateWindows'] = []
-
-  for (let startIndex = 0; startIndex <= dayCounts.length - duration; startIndex += 1) {
-    const slice = dayCounts.slice(startIndex, startIndex + duration)
-    const totalAvailable = slice.reduce((sum, day) => sum + day.count, 0)
-    const perfectDays = slice.filter((day) => day.count === totalParticipants).length
-
-    windows.push({
-      startDate: slice[0].date.toISOString(),
-      endDate: slice[slice.length - 1].date.toISOString(),
-      averageAvailable: totalAvailable / slice.length,
-      perfectDays,
-    })
-  }
-
-  return windows
-    .sort((a, b) => {
-      if (b.averageAvailable !== a.averageAvailable) return b.averageAvailable - a.averageAvailable
-      if (b.perfectDays !== a.perfectDays) return b.perfectDays - a.perfectDays
-      return new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
-    })
-    .slice(0, 3)
+  return Math.max(1, Math.min(tripLength, longestBestSpan))
 }
 
 function buildTripPlanSuggestions(trip: TripWithResponses): TripPlanSuggestions {
-  const tripStart = normalizeDate(trip.startDate)
-  const tripEnd = normalizeDate(trip.endDate)
-  const suggestedDurationDays = Math.min(
-    4,
-    Math.max(1, Math.floor((tripEnd.getTime() - tripStart.getTime()) / (1000 * 60 * 60 * 24)) + 1),
-  )
-
   return {
     topDestinations: countLabels(trip.responses.flatMap((response) => response.destinations)).slice(0, 4),
     commonInterests: countLabels(trip.responses.flatMap((response) => response.interests)).slice(0, 4),
     budgetPreferences: countLabels(trip.responses.map((response) => response.budget).filter(Boolean)).slice(0, 4),
     bestDateWindows: getDateWindowSuggestions(trip),
-    suggestedDurationDays,
+    suggestedDurationDays: getSuggestedDurationDays(trip),
   }
 }
 
@@ -359,6 +401,13 @@ async function ensureTripPlan(tripId: string) {
       responses: {
         orderBy: {
           submittedAt: 'asc',
+        },
+        include: {
+          unavailableRanges: {
+            orderBy: {
+              startDate: 'asc',
+            },
+          },
         },
       },
       plan: {
@@ -470,6 +519,13 @@ export async function getTripWithResponses(tripId: string): Promise<TripWithResp
         orderBy: {
           submittedAt: 'asc',
         },
+        include: {
+          unavailableRanges: {
+            orderBy: {
+              startDate: 'asc',
+            },
+          },
+        },
       },
     },
   })
@@ -568,6 +624,7 @@ export async function createResponse(tripId: string, input: CreateResponseInput)
 
   const destinations = normalizeList(input.destinations)
   const interests = normalizeList(input.interests)
+  const unavailableRanges = normalizeUnavailableRanges(input.unavailableRanges)
   const tripStart = normalizeDate(trip.startDate)
   const tripEnd = normalizeDate(trip.endDate)
 
@@ -586,6 +643,21 @@ export async function createResponse(tripId: string, input: CreateResponseInput)
     if (availabilityStart < tripStart || availabilityEnd > tripEnd) {
       throw new Error('Availability must stay within the trip date range.')
     }
+
+    for (const range of unavailableRanges) {
+      const blockedStart = normalizeDate(range.startDate)
+      const blockedEnd = normalizeDate(range.endDate)
+
+      if (blockedStart > blockedEnd) {
+        throw new Error('Blocked dates must start before they end.')
+      }
+
+      if (blockedStart < availabilityStart || blockedEnd > availabilityEnd) {
+        throw new Error('Blocked dates must stay inside your availability range.')
+      }
+    }
+  } else if (unavailableRanges.length > 0) {
+    throw new Error('Choose your general availability before adding blocked dates.')
   }
 
   await syncTripDestinationOptions(tripId, destinations)
@@ -601,10 +673,24 @@ export async function createResponse(tripId: string, input: CreateResponseInput)
       editCode: normalizedEditCode,
       availabilityStart: input.availabilityStart || null,
       availabilityEnd: input.availabilityEnd || null,
+      unavailableRanges: {
+        create: unavailableRanges.map((range) => ({
+          id: generateId(10),
+          startDate: range.startDate,
+          endDate: range.endDate,
+        })),
+      },
       destinations,
       budget: input.budget || '',
       interests,
       notes: input.notes?.trim() || '',
+    },
+    include: {
+      unavailableRanges: {
+        orderBy: {
+          startDate: 'asc',
+        },
+      },
     },
   })
 
@@ -620,6 +706,9 @@ export async function updateResponse(
     where: {
       id: responseId,
       tripId,
+    },
+    include: {
+      unavailableRanges: true,
     },
   })
 
@@ -647,6 +736,7 @@ export async function updateResponse(
 
   const destinations = normalizeList(input.destinations)
   const interests = normalizeList(input.interests)
+  const unavailableRanges = normalizeUnavailableRanges(input.unavailableRanges)
   const tripStart = normalizeDate(trip.startDate)
   const tripEnd = normalizeDate(trip.endDate)
 
@@ -665,6 +755,21 @@ export async function updateResponse(
     if (availabilityStart < tripStart || availabilityEnd > tripEnd) {
       throw new Error('Availability must stay within the trip date range.')
     }
+
+    for (const range of unavailableRanges) {
+      const blockedStart = normalizeDate(range.startDate)
+      const blockedEnd = normalizeDate(range.endDate)
+
+      if (blockedStart > blockedEnd) {
+        throw new Error('Blocked dates must start before they end.')
+      }
+
+      if (blockedStart < availabilityStart || blockedEnd > availabilityEnd) {
+        throw new Error('Blocked dates must stay inside your availability range.')
+      }
+    }
+  } else if (unavailableRanges.length > 0) {
+    throw new Error('Choose your general availability before adding blocked dates.')
   }
 
   await syncTripDestinationOptions(tripId, destinations)
@@ -677,10 +782,25 @@ export async function updateResponse(
     data: {
       availabilityStart: input.availabilityStart || null,
       availabilityEnd: input.availabilityEnd || null,
+      unavailableRanges: {
+        deleteMany: {},
+        create: unavailableRanges.map((range) => ({
+          id: generateId(10),
+          startDate: range.startDate,
+          endDate: range.endDate,
+        })),
+      },
       destinations,
       budget: input.budget || '',
       interests,
       notes: input.notes?.trim() || '',
+    },
+    include: {
+      unavailableRanges: {
+        orderBy: {
+          startDate: 'asc',
+        },
+      },
     },
   })
 
@@ -701,6 +821,13 @@ export async function recoverResponse(tripId: string, input: RecoverResponseInpu
       name: {
         equals: name,
         mode: 'insensitive',
+      },
+    },
+    include: {
+      unavailableRanges: {
+        orderBy: {
+          startDate: 'asc',
+        },
       },
     },
   })

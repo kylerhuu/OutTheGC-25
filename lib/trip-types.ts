@@ -16,6 +16,7 @@ export interface ResponseRecord {
   editCode: string
   availabilityStart: string | null
   availabilityEnd: string | null
+  unavailableRanges: Array<{ startDate: string; endDate: string }>
   destinations: string[]
   budget: string
   interests: string[]
@@ -30,6 +31,7 @@ export interface PublicResponseRecord {
   name: string
   availabilityStart: string | null
   availabilityEnd: string | null
+  unavailableRanges: Array<{ startDate: string; endDate: string }>
   destinations: string[]
   budget: string
   interests: string[]
@@ -108,6 +110,7 @@ export interface CreateResponseInput {
   name: string
   availabilityStart?: string | null
   availabilityEnd?: string | null
+  unavailableRanges?: Array<{ startDate: string; endDate: string }>
   destinations?: string[]
   budget?: string
   interests?: string[]

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { DateRange } from 'react-day-picker'
-import { ArrowRight, Plus, X, Eye, Pencil } from 'lucide-react'
+import { AlertTriangle, ArrowRight, Plus, RotateCcw, X, Eye, Pencil } from 'lucide-react'
 import { Calendar } from '@/components/ui/calendar'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -54,6 +54,7 @@ const BUDGET_OPTIONS = [
 interface UserInput {
   name: string
   availability: DateRange | undefined
+  unavailableRanges: DateRange[]
   destinations: string[]
   budget: string
   interests: string[]
@@ -91,6 +92,10 @@ export function EventInputPanel({
   const resolveInterestValue = (interest: string) => INTEREST_LABELS[interest] || interest
   const [name, setName] = useState('')
   const [availability, setAvailability] = useState<DateRange | undefined>(undefined)
+  const [unavailableRanges, setUnavailableRanges] = useState<DateRange[]>([])
+  const [blockedDraftRange, setBlockedDraftRange] = useState<DateRange | undefined>(undefined)
+  const [blockedAnchorDate, setBlockedAnchorDate] = useState<Date | null>(null)
+  const [isAddingBlockedDates, setIsAddingBlockedDates] = useState(false)
   const [destinations, setDestinations] = useState<string[]>([])
   const [customDestination, setCustomDestination] = useState('')
   const [budget, setBudget] = useState('')
@@ -149,6 +154,7 @@ export function EventInputPanel({
           ? { from: editingParticipant.availability.from, to: editingParticipant.availability.to }
           : undefined
       )
+      setUnavailableRanges(editingParticipant.unavailableRanges.map((range) => ({ from: range.from, to: range.to })))
       setDestinations(editingParticipant.destinations)
       setBudget(editingParticipant.budget)
       setInterests(editingParticipant.interests.map(resolveInterestValue))
@@ -157,6 +163,10 @@ export function EventInputPanel({
       // Reset form
       setName('')
       setAvailability(undefined)
+      setUnavailableRanges([])
+      setBlockedDraftRange(undefined)
+      setBlockedAnchorDate(null)
+      setIsAddingBlockedDates(false)
       setDestinations([])
       setBudget('')
       setInterests([])
@@ -167,6 +177,25 @@ export function EventInputPanel({
     setSubmitError('')
     setRecoveryError('')
   }, [editingParticipant])
+
+  useEffect(() => {
+    if (!availability?.from || !availability?.to) {
+      setUnavailableRanges([])
+      setBlockedDraftRange(undefined)
+      setBlockedAnchorDate(null)
+      setIsAddingBlockedDates(false)
+      return
+    }
+
+    const from = availability.from.getTime()
+    const to = availability.to.getTime()
+    setUnavailableRanges((current) =>
+      current.filter((range) => {
+        if (!range.from || !range.to) return false
+        return range.from.getTime() >= from && range.to.getTime() <= to
+      }),
+    )
+  }, [availability?.from, availability?.to])
 
   const addDestination = (dest: string) => {
     const trimmed = dest.trim().replace(/\s+/g, ' ')
@@ -221,6 +250,7 @@ export function EventInputPanel({
       await onSubmit({
         name,
         availability,
+        unavailableRanges,
         destinations,
         budget,
         interests,
@@ -320,6 +350,107 @@ export function EventInputPanel({
   }
 
   const isEditMode = !!editingParticipant
+
+  const blockedRangeModifiers = useMemo(
+    () =>
+      unavailableRanges
+        .filter((range) => range.from && range.to)
+        .map((range) => ({ from: range.from!, to: range.to! })),
+    [unavailableRanges],
+  )
+
+  const addUnavailableRange = (range: DateRange) => {
+    if (!range.from || !range.to) return
+
+    const normalized = { from: range.from, to: range.to }
+    const nextRanges = [...unavailableRanges, normalized]
+      .filter((item) => item.from && item.to)
+      .sort((a, b) => a.from!.getTime() - b.from!.getTime())
+
+    const merged: DateRange[] = []
+
+    for (const current of nextRanges) {
+      const previous = merged[merged.length - 1]
+      if (!previous?.from || !previous?.to) {
+        merged.push(current)
+        continue
+      }
+
+      if (current.from!.getTime() <= previous.to.getTime() + 24 * 60 * 60 * 1000) {
+        previous.to = new Date(Math.max(previous.to.getTime(), current.to!.getTime()))
+      } else {
+        merged.push(current)
+      }
+    }
+
+    setUnavailableRanges(merged)
+    setBlockedDraftRange(undefined)
+    setBlockedAnchorDate(null)
+  }
+
+  const removeUnavailableRange = (target: DateRange) => {
+    setUnavailableRanges((current) =>
+      current.filter((range) => {
+        if (!range.from || !range.to || !target.from || !target.to) return true
+        return !(
+          range.from.getTime() === target.from.getTime() && range.to.getTime() === target.to.getTime()
+        )
+      }),
+    )
+  }
+
+  const resetBlockedDateDraft = () => {
+    setBlockedAnchorDate(null)
+    setBlockedDraftRange(undefined)
+  }
+
+  const blockedDraftModifiers = useMemo(
+    () =>
+      blockedDraftRange?.from && blockedDraftRange?.to
+        ? [{ from: blockedDraftRange.from, to: blockedDraftRange.to }]
+        : [],
+    [blockedDraftRange],
+  )
+
+  const handleAvailabilityCalendarSelect = (range: DateRange | undefined) => {
+    if (isAddingBlockedDates) return
+    setAvailability(range)
+  }
+
+  const handleBlockedDayClick = (day: Date) => {
+    if (!isAddingBlockedDates || !availability?.from || !availability?.to) return
+
+    const minDate = availability.from.getTime()
+    const maxDate = availability.to.getTime()
+    const clicked = day.getTime()
+
+    if (clicked < minDate || clicked > maxDate) return
+
+    if (!blockedAnchorDate) {
+      setBlockedAnchorDate(day)
+      setBlockedDraftRange({ from: day, to: day })
+      return
+    }
+
+    const from = new Date(Math.min(blockedAnchorDate.getTime(), day.getTime()))
+    const to = new Date(Math.max(blockedAnchorDate.getTime(), day.getTime()))
+    addUnavailableRange({ from, to })
+  }
+
+  const handleBlockedDayHover = (day: Date) => {
+    if (!isAddingBlockedDates || !blockedAnchorDate || !availability?.from || !availability?.to) return
+
+    const minDate = availability.from.getTime()
+    const maxDate = availability.to.getTime()
+    const hovered = day.getTime()
+
+    if (hovered < minDate || hovered > maxDate) return
+
+    setBlockedDraftRange({
+      from: new Date(Math.min(blockedAnchorDate.getTime(), day.getTime())),
+      to: new Date(Math.max(blockedAnchorDate.getTime(), day.getTime())),
+    })
+  }
 
   return (
     <Card className="bg-card border-border/60 shadow-sm">
@@ -430,23 +561,156 @@ export function EventInputPanel({
         <div className="flex flex-col gap-3 pt-2">
           <div>
             <Label className="text-sm font-medium block mb-1">Your Availability</Label>
-            <p className="text-xs text-muted-foreground">Select when you can travel</p>
+            <p className="text-xs text-muted-foreground">
+              Select your general travel window first, then optionally paint blocked dates on top of it.
+            </p>
           </div>
           <div className="border border-border/60 rounded-xl p-4 bg-card/50 overflow-hidden shadow-sm">
+            <div
+              className={`mb-3 rounded-xl border px-3 py-3 transition-colors ${
+                isAddingBlockedDates
+                  ? 'border-destructive/40 bg-gradient-to-r from-destructive/12 via-destructive/6 to-primary/5 shadow-sm'
+                  : 'border-border/60 bg-muted/30'
+              }`}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    {isAddingBlockedDates ? (
+                      <AlertTriangle className="size-4 text-destructive" />
+                    ) : (
+                      <div className="size-2 rounded-full bg-primary" />
+                    )}
+                    <p className="text-sm font-semibold text-foreground">
+                      {isAddingBlockedDates ? 'Blocked date mode is on' : 'General availability mode'}
+                    </p>
+                  </div>
+                  <p className={`text-xs ${isAddingBlockedDates ? 'text-destructive/90' : 'text-muted-foreground'}`}>
+                    {isAddingBlockedDates
+                      ? 'Click once to start a blocked range, then click again to finish it. Strong red dates will be cut out from the travel window below.'
+                      : 'Drag across the dates you can travel. Then optionally switch modes to mark dates inside that range that you cannot do.'}
+                  </p>
+                </div>
+
+                {availability?.from && availability?.to && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={isAddingBlockedDates ? 'default' : 'outline'}
+                    className={isAddingBlockedDates ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90' : ''}
+                    onClick={() => {
+                      setIsAddingBlockedDates((current) => !current)
+                      resetBlockedDateDraft()
+                    }}
+                  >
+                    {isAddingBlockedDates ? 'Done' : 'Optional: Add blocked dates'}
+                  </Button>
+                )}
+              </div>
+
+              {isAddingBlockedDates && (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Badge variant="outline" className="border-destructive/30 bg-destructive/10 text-destructive">
+                    Red = blocked
+                  </Badge>
+                  <Badge variant="outline" className="border-primary/20 bg-primary/10 text-primary">
+                    Purple = main window
+                  </Badge>
+                  {blockedAnchorDate && (
+                    <>
+                      <Badge variant="outline" className="border-destructive/30 bg-background text-foreground">
+                        Start picked: {blockedAnchorDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      </Badge>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 px-2 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                        onClick={resetBlockedDateDraft}
+                      >
+                        <RotateCcw className="mr-1 size-3.5" />
+                        Reset current block
+                      </Button>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
             <Calendar
               mode="range"
               selected={availability}
-              onSelect={setAvailability}
+              onSelect={handleAvailabilityCalendarSelect}
+              onDayClick={(day) => handleBlockedDayClick(day)}
+              onDayMouseEnter={(day) => handleBlockedDayHover(day)}
               disabled={{ before: tripDateRange.from, after: tripDateRange.to }}
+              modifiers={{
+                blocked: blockedRangeModifiers,
+                blockedDraft: blockedDraftModifiers,
+              }}
+              modifiersClassNames={{
+                blocked:
+                  'bg-destructive text-destructive-foreground font-semibold line-through ring-2 ring-destructive/60 ring-inset hover:bg-destructive',
+                blockedDraft:
+                  'bg-destructive/30 text-destructive-foreground font-semibold ring-2 ring-destructive/40 ring-inset hover:bg-destructive/30',
+              }}
               defaultMonth={tripDateRange.from}
               numberOfMonths={1}
-              className="w-full [&_.rdp]:w-full [&_.rdp_cell]:w-1/7"
+              className={`w-full [&_.rdp]:w-full [&_.rdp_cell]:w-1/7 ${
+                isAddingBlockedDates
+                  ? '[&_[data-range-middle=true]]:bg-primary/18 [&_[data-range-middle=true]]:text-foreground [&_[data-range-middle=true]]:opacity-100 [&_[data-range-start=true]]:bg-primary/26 [&_[data-range-start=true]]:text-foreground [&_[data-range-start=true]]:opacity-100 [&_[data-range-end=true]]:bg-primary/26 [&_[data-range-end=true]]:text-foreground [&_[data-range-end=true]]:opacity-100 [&_[data-selected-single=true]]:bg-primary/26 [&_[data-selected-single=true]]:text-foreground [&_[data-selected-single=true]]:opacity-100'
+                  : ''
+              }`}
             />
           </div>
           {availability?.from && availability?.to && (
             <div className="flex items-center gap-2 text-sm text-primary font-medium bg-primary/5 px-3 py-2 rounded-lg">
               <svg className="size-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
               {availability.from.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – {availability.to.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+            </div>
+          )}
+
+          {unavailableRanges.length > 0 && (
+            <div className="rounded-xl border border-border/60 bg-muted/20 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-medium text-foreground">Blocked dates</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    These dates will be treated as unavailable even though they sit inside your main range.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  className="text-muted-foreground"
+                  onClick={() => {
+                    setUnavailableRanges([])
+                    resetBlockedDateDraft()
+                  }}
+                >
+                  Clear all
+                </Button>
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {unavailableRanges.map((range) => (
+                  <Badge
+                    key={`${range.from?.toISOString()}-${range.to?.toISOString()}`}
+                    variant="outline"
+                    className="gap-2 border-destructive/25 bg-destructive/8 py-1.5 text-foreground"
+                  >
+                    {range.from?.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} –{' '}
+                    {range.to?.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    <button
+                      type="button"
+                      onClick={() => removeUnavailableRange(range)}
+                      className="text-muted-foreground hover:text-foreground"
+                      aria-label="Remove blocked date range"
+                    >
+                      <X className="size-3" />
+                    </button>
+                  </Badge>
+                ))}
+              </div>
             </div>
           )}
         </div>

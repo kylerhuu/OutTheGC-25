@@ -3,7 +3,18 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Users } from 'lucide-react'
 import { ParticipantDetails } from '@/components/tripsync/participant-details'
-import type { ParticipantData } from '@/app/event/[tripId]/page'
+
+interface ParticipantData {
+  id: string
+  name: string
+  availability: { from: Date; to: Date } | null
+  unavailableRanges: Array<{ from: Date; to: Date }>
+  destinations: string[]
+  budget: string
+  interests: string[]
+  notes: string
+  submittedAt: Date
+}
 
 interface EventSummaryPanelProps {
   participants: ParticipantData[]

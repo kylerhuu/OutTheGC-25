@@ -1,11 +1,12 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { Calendar, DollarSign, Heart, Loader2, MapPin, MessageSquare, Users } from 'lucide-react'
 import { EventTopBar } from '@/components/tripsync/event-top-bar'
 import { BestTripOption } from '@/components/tripsync/best-trip-option'
 import { AvailabilityHeatmap } from '@/components/tripsync/availability-heatmap'
+import { EventSummaryPanel } from '@/components/tripsync/event-summary-panel'
 import { parseStoredDate, toDateOnlyString } from '@/lib/date-utils'
 import { getBestDateWindows, getTripLengthDays } from '@/lib/availability'
 import { Badge } from '@/components/ui/badge'
@@ -18,6 +19,7 @@ interface ParticipantData {
   id: string
   name: string
   availability: { from: Date; to: Date } | null
+  unavailableRanges: Array<{ from: Date; to: Date }>
   destinations: string[]
   budget: string
   interests: string[]
@@ -70,6 +72,10 @@ function responseToParticipant(response: PublicResponseRecord): ParticipantData 
             to: parseStoredDate(response.availabilityEnd),
           }
         : null,
+    unavailableRanges: response.unavailableRanges.map((range) => ({
+      from: parseStoredDate(range.startDate),
+      to: parseStoredDate(range.endDate),
+    })),
     destinations: response.destinations,
     budget: response.budget,
     interests: response.interests,
@@ -115,7 +121,9 @@ export default function ResultsPage() {
   const [plan, setPlan] = useState<TripPlanRecord | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [selectedParticipantId, setSelectedParticipantId] = useState<string | null>(null)
   const [tripDurationDays, setTripDurationDays] = useState(4)
+  const hasInitializedTripLength = useRef(false)
   const [isApplyingSelection, setIsApplyingSelection] = useState(false)
   const [applyMessage, setApplyMessage] = useState<string | null>(null)
   const [applyError, setApplyError] = useState<string | null>(null)
@@ -137,7 +145,9 @@ export default function ResultsPage() {
       }
 
       setTrip(tripData.trip)
-      setParticipants(tripData.trip.responses.map(responseToParticipant))
+      const nextParticipants = tripData.trip.responses.map(responseToParticipant)
+      setParticipants(nextParticipants)
+      setSelectedParticipantId((current) => current ?? nextParticipants[0]?.id ?? null)
       setPlan(planResponse.ok && planData.plan ? planData.plan : null)
     } catch (error) {
       setLoadError(error instanceof Error ? error.message : 'Unable to load trip results.')
@@ -225,12 +235,15 @@ export default function ResultsPage() {
   }, [maxTripDuration])
 
   useEffect(() => {
-    if (!trip) return
+    if (!trip || hasInitializedTripLength.current) return
+
     if (plan?.finalStartDate && plan?.finalEndDate) {
       setTripDurationDays(getTripLengthDays(plan.finalStartDate, plan.finalEndDate))
-      return
+    } else {
+      setTripDurationDays(Math.min(4, maxTripDuration))
     }
-    setTripDurationDays(Math.min(4, maxTripDuration))
+
+    hasInitializedTripLength.current = true
   }, [maxTripDuration, plan?.finalEndDate, plan?.finalStartDate, trip])
 
   const currentPlanWindowKey = useMemo(() => {
@@ -552,32 +565,13 @@ export default function ResultsPage() {
           </div>
         )}
 
-        {/* Who responded */}
-        <div className="rounded-2xl border border-border bg-card p-5">
-          <div className="flex items-center gap-2 mb-4">
-            <Users className="size-4 text-primary shrink-0" />
-            <p className="text-sm font-semibold text-foreground">
-              Who responded
-              <span className="ml-2 text-xs font-normal text-muted-foreground">({participants.length})</span>
-            </p>
-          </div>
-          {participants.length === 0 ? (
-            <p className="text-xs text-muted-foreground">No responses yet.</p>
-          ) : (
-            <div className="flex flex-wrap gap-2">
-              {participants.map((participant) => (
-                <div key={participant.id} className="flex items-center gap-2 rounded-full border border-border bg-muted/30 pl-1 pr-3 py-1">
-                  <div
-                    className={`size-6 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${getAvatarColor(participant.name)}`}
-                  >
-                    {getInitials(participant.name)}
-                  </div>
-                  <span className="text-xs font-medium text-foreground">{participant.name}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+        <EventSummaryPanel
+          participants={participants}
+          selectedParticipantId={selectedParticipantId}
+          onSelectParticipant={setSelectedParticipantId}
+          currentUserId={null}
+          onEditParticipant={() => undefined}
+        />
       </div>
     </div>
   )

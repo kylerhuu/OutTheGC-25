@@ -33,9 +33,21 @@ model TripResponse {
   notes             String
   submittedAt       DateTime @default(now())
   updatedAt         DateTime @updatedAt
+  unavailableRanges TripResponseUnavailableRange[]
   trip              Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade)
 
   @@index([tripId])
+}
+
+model TripResponseUnavailableRange {
+  id         String       @id
+  responseId String
+  startDate  String
+  endDate    String
+  createdAt  DateTime     @default(now())
+  response   TripResponse @relation(fields: [responseId], references: [id], onDelete: Cascade)
+
+  @@index([responseId])
 }
 
 model TripDestination {

@@ -4,7 +4,18 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Calendar, MapPin, DollarSign, Heart, MessageSquare, Pencil } from 'lucide-react'
-import type { ParticipantData } from '@/app/event/[tripId]/page'
+
+interface ParticipantData {
+  id: string
+  name: string
+  availability: { from: Date; to: Date } | null
+  unavailableRanges: Array<{ from: Date; to: Date }>
+  destinations: string[]
+  budget: string
+  interests: string[]
+  notes: string
+  submittedAt: Date
+}
 
 interface ParticipantDetailsProps {
   participant: ParticipantData
@@ -88,6 +99,23 @@ export function ParticipantDetails({ participant, isCurrentUser, onEdit }: Parti
             </p>
           ) : (
             <p className="text-sm text-muted-foreground pl-6 italic">Not specified</p>
+          )}
+
+          {participant.unavailableRanges.length > 0 && (
+            <div className="pl-6 pt-1">
+              <p className="text-xs font-medium text-destructive">Blocked inside that range</p>
+              <div className="mt-1 flex flex-wrap gap-1.5">
+                {participant.unavailableRanges.map((range) => (
+                  <Badge
+                    key={`${range.from.toISOString()}-${range.to.toISOString()}`}
+                    variant="outline"
+                    className="border-destructive/25 bg-destructive/8 text-xs text-foreground"
+                  >
+                    {formatDate(range.from)} – {formatDate(range.to)}
+                  </Badge>
+                ))}
+              </div>
+            </div>
           )}
         </div>
 

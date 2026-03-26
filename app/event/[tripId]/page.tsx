@@ -5,7 +5,6 @@ import { useParams } from 'next/navigation'
 import type { DateRange } from 'react-day-picker'
 import { EventTopBar } from '@/components/tripsync/event-top-bar'
 import { EventInputPanel } from '@/components/tripsync/event-input-panel'
-import { EventSummaryPanel } from '@/components/tripsync/event-summary-panel'
 import { parseStoredDate, toDateOnlyString } from '@/lib/date-utils'
 import type { CreateResponseInput, PublicResponseRecord, ResponseRecord, TripWithResponses } from '@/lib/trip-types'
 
@@ -13,6 +12,7 @@ export interface ParticipantData {
   id: string
   name: string
   availability: { from: Date; to: Date } | null
+  unavailableRanges: Array<{ from: Date; to: Date }>
   destinations: string[]
   budget: string
   interests: string[]
@@ -110,6 +110,10 @@ function responseToParticipant(response: PublicResponseRecord | ResponseRecord):
             to: parseStoredDate(response.availabilityEnd),
           }
         : null,
+    unavailableRanges: response.unavailableRanges.map((range) => ({
+      from: parseStoredDate(range.startDate),
+      to: parseStoredDate(range.endDate),
+    })),
     destinations: response.destinations,
     budget: response.budget,
     interests: response.interests,
@@ -128,7 +132,6 @@ export default function EventPage() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [tripAccess, setTripAccess] = useState<TripAccess | null>(null)
   const [hasSubmitted, setHasSubmitted] = useState(false)
-  const [selectedParticipantId, setSelectedParticipantId] = useState<string | null>(null)
   const [editingParticipant, setEditingParticipant] = useState<ParticipantData | null>(null)
   const [savedEditCode, setSavedEditCode] = useState<string | null>(null)
 
@@ -169,7 +172,6 @@ export default function EventPage() {
         setCurrentUserId(matchedParticipant.id)
         setHasSubmitted(true)
         setSavedEditCode(storedAccess.editCode)
-        setSelectedParticipantId(matchedParticipant.id)
       } else {
         if (storedAccessRaw) {
           window.localStorage.removeItem(getTripAccessKey(tripId))
@@ -179,7 +181,6 @@ export default function EventPage() {
         setHasSubmitted(false)
         setSavedEditCode(null)
         setEditingParticipant(null)
-        setSelectedParticipantId(nextParticipants[0]?.id ?? null)
       }
     } catch (error) {
       setLoadError(error instanceof Error ? error.message : 'Unable to load trip.')
@@ -218,7 +219,6 @@ export default function EventPage() {
     setTripAccess(nextAccess)
     setCurrentUserId(recoveredParticipant.id)
     setSavedEditCode(data.response.editCode)
-    setSelectedParticipantId(recoveredParticipant.id)
     setEditingParticipant(recoveredParticipant)
     setHasSubmitted(false)
   }, [tripId])
@@ -227,6 +227,7 @@ export default function EventPage() {
   const handleSubmit = useCallback(async (input: {
     name: string
     availability: DateRange | undefined
+    unavailableRanges: DateRange[]
     destinations: string[]
     budget: string
     interests: string[]
@@ -237,6 +238,12 @@ export default function EventPage() {
       name: input.name,
       availabilityStart: input.availability?.from ? toDateOnlyString(input.availability.from) : null,
       availabilityEnd: input.availability?.to ? toDateOnlyString(input.availability.to) : null,
+      unavailableRanges: input.unavailableRanges
+        .filter((range) => range.from && range.to)
+        .map((range) => ({
+          startDate: toDateOnlyString(range.from!),
+          endDate: toDateOnlyString(range.to!),
+        })),
       destinations: input.destinations,
       budget: input.budget,
       interests: input.interests,
@@ -359,7 +366,7 @@ export default function EventPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-4xl px-4 py-6 sm:px-6 lg:px-8">
         <div className="flex flex-col gap-6">
           {/* Top Bar */}
           <EventTopBar
@@ -371,34 +378,19 @@ export default function EventPage() {
             activeTab="responses"
           />
 
-          {/* Main Content - Two Column Layout */}
-          <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-            <div className="lg:col-span-3">
-              <EventInputPanel
-                tripDateRange={{ from: parseStoredDate(trip.startDate), to: parseStoredDate(trip.endDate) }}
-                destinationOptions={getDestinationOptions(trip.destinationOptions)}
-                interestOptions={getInterestOptions(trip.interestOptions)}
-                onSubmit={handleSubmit}
-                onRecoverSubmission={handleRecoverSubmission}
-                hasSubmitted={hasSubmitted}
-                editingParticipant={editingParticipant}
-                onEditSubmission={currentUserId ? () => handleEditSubmission(currentUserId) : undefined}
-                onViewResults={handleViewResults}
-                onGoToPlanning={handleGoToPlanning}
-                savedEditCode={savedEditCode}
-              />
-            </div>
-
-            <div className="lg:col-span-2">
-              <EventSummaryPanel
-                participants={participants}
-                selectedParticipantId={selectedParticipantId}
-                onSelectParticipant={setSelectedParticipantId}
-                currentUserId={currentUserId}
-                onEditParticipant={handleEditSubmission}
-              />
-            </div>
-          </div>
+          <EventInputPanel
+            tripDateRange={{ from: parseStoredDate(trip.startDate), to: parseStoredDate(trip.endDate) }}
+            destinationOptions={getDestinationOptions(trip.destinationOptions)}
+            interestOptions={getInterestOptions(trip.interestOptions)}
+            onSubmit={handleSubmit}
+            onRecoverSubmission={handleRecoverSubmission}
+            hasSubmitted={hasSubmitted}
+            editingParticipant={editingParticipant}
+            onEditSubmission={currentUserId ? () => handleEditSubmission(currentUserId) : undefined}
+            onViewResults={handleViewResults}
+            onGoToPlanning={handleGoToPlanning}
+            savedEditCode={savedEditCode}
+          />
         </div>
       </div>
     </div>

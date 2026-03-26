@@ -14,6 +14,16 @@ export interface AvailabilitySpan {
   availableCount: number
 }
 
+function isBlocked(date: Date, unavailableRanges: Array<{ startDate: string; endDate: string }>) {
+  return unavailableRanges.some((range) => {
+    const blockedFrom = parseStoredDate(range.startDate)
+    const blockedTo = parseStoredDate(range.endDate)
+    blockedFrom.setHours(0, 0, 0, 0)
+    blockedTo.setHours(23, 59, 59, 999)
+    return date >= blockedFrom && date <= blockedTo
+  })
+}
+
 export function getTripLengthDays(startDate: string, endDate: string) {
   return Math.max(
     1,
@@ -45,7 +55,8 @@ export function getBestDateWindows(
       const availableTo = parseStoredDate(response.availabilityEnd)
       availableFrom.setHours(0, 0, 0, 0)
       availableTo.setHours(23, 59, 59, 999)
-      return day >= availableFrom && day <= availableTo
+      if (!(day >= availableFrom && day <= availableTo)) return false
+      return !isBlocked(day, response.unavailableRanges)
     }).length
 
     days.push({ date: new Date(day), count })
@@ -117,7 +128,8 @@ export function getBestAvailabilitySpans(
       const availableTo = parseStoredDate(response.availabilityEnd)
       availableFrom.setHours(0, 0, 0, 0)
       availableTo.setHours(23, 59, 59, 999)
-      return day >= availableFrom && day <= availableTo
+      if (!(day >= availableFrom && day <= availableTo)) return false
+      return !isBlocked(day, response.unavailableRanges)
     }).length
 
     days.push({ date: new Date(day), count })

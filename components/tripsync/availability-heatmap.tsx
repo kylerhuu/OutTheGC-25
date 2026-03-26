@@ -62,7 +62,14 @@ export function AvailabilityHeatmap({
         const availTo = new Date(p.availability.to)
         availFrom.setHours(0, 0, 0, 0)
         availTo.setHours(23, 59, 59, 999)
-        return dayStart >= availFrom && dayStart <= availTo
+        if (!(dayStart >= availFrom && dayStart <= availTo)) return false
+        return !p.unavailableRanges.some((range) => {
+          const blockedFrom = new Date(range.from)
+          const blockedTo = new Date(range.to)
+          blockedFrom.setHours(0, 0, 0, 0)
+          blockedTo.setHours(23, 59, 59, 999)
+          return dayStart >= blockedFrom && dayStart <= blockedTo
+        })
       }).length
 
       days.push({
