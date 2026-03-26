@@ -101,6 +101,11 @@ export function EventInputPanel({
   savedEditCode,
 }: EventInputPanelProps) {
   const resolveInterestValue = (interest: string) => INTEREST_LABELS[interest] || interest
+  const cloneValidDate = (value: Date | null | undefined) => {
+    if (!value) return null
+    const cloned = new Date(value)
+    return Number.isNaN(cloned.getTime()) ? null : cloned
+  }
   const [name, setName] = useState('')
   const [availability, setAvailability] = useState<DateRange | undefined>(undefined)
   const [unavailableRanges, setUnavailableRanges] = useState<DateRange[]>([])
@@ -159,25 +164,34 @@ export function EventInputPanel({
   // Populate form when editing
   useEffect(() => {
     if (editingParticipant) {
+      const safeAvailabilityFrom = cloneValidDate(editingParticipant.availability?.from)
+      const safeAvailabilityTo = cloneValidDate(editingParticipant.availability?.to)
       const safeAvailability =
-        editingParticipant.availability?.from && editingParticipant.availability?.to
+        safeAvailabilityFrom && safeAvailabilityTo && safeAvailabilityFrom.getTime() <= safeAvailabilityTo.getTime()
           ? {
-              from: new Date(editingParticipant.availability.from),
-              to: new Date(editingParticipant.availability.to),
+              from: safeAvailabilityFrom,
+              to: safeAvailabilityTo,
             }
           : undefined
 
       const safeUnavailableRanges = editingParticipant.unavailableRanges
         .filter((range) => range.from && range.to)
         .map((range) => ({
-          from: new Date(range.from),
-          to: new Date(range.to),
+          from: cloneValidDate(range.from),
+          to: cloneValidDate(range.to),
         }))
         .filter(
           (range) =>
-            !Number.isNaN(range.from.getTime()) &&
-            !Number.isNaN(range.to.getTime()) &&
+            !!range.from &&
+            !!range.to &&
             range.from.getTime() <= range.to.getTime(),
+        )
+        .map((range) => ({ from: range.from!, to: range.to! }))
+        .filter((range) =>
+          safeAvailability
+            ? range.from.getTime() >= safeAvailability.from.getTime() &&
+              range.to.getTime() <= safeAvailability.to.getTime()
+            : false,
         )
 
       setName(editingParticipant.name)

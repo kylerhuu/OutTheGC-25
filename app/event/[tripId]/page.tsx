@@ -122,6 +122,47 @@ function responseToParticipant(response: PublicResponseRecord | ResponseRecord):
   }
 }
 
+function sanitizeParticipantForEdit(participant: ParticipantData): ParticipantData {
+  const availability =
+    participant.availability?.from && participant.availability?.to
+      ? {
+          from: new Date(participant.availability.from),
+          to: new Date(participant.availability.to),
+        }
+      : null
+
+  const validAvailability =
+    availability &&
+    !Number.isNaN(availability.from.getTime()) &&
+    !Number.isNaN(availability.to.getTime()) &&
+    availability.from.getTime() <= availability.to.getTime()
+      ? availability
+      : null
+
+  const unavailableRanges = participant.unavailableRanges
+    .map((range) => ({
+      from: new Date(range.from),
+      to: new Date(range.to),
+    }))
+    .filter(
+      (range) =>
+        !Number.isNaN(range.from.getTime()) &&
+        !Number.isNaN(range.to.getTime()) &&
+        range.from.getTime() <= range.to.getTime() &&
+        (!validAvailability ||
+          (range.from.getTime() >= validAvailability.from.getTime() &&
+            range.to.getTime() <= validAvailability.to.getTime())),
+    )
+
+  return {
+    ...participant,
+    availability: validAvailability,
+    unavailableRanges,
+    destinations: [...participant.destinations],
+    interests: [...participant.interests],
+  }
+}
+
 export default function EventPage() {
   const params = useParams()
   const tripId = params.tripId as string
@@ -305,7 +346,7 @@ export default function EventPage() {
   const handleEditSubmission = useCallback((participantId: string) => {
     const participant = participants.find(p => p.id === participantId)
     if (participant) {
-      setEditingParticipant(participant)
+      setEditingParticipant(sanitizeParticipantForEdit(participant))
       setHasSubmitted(false)
     }
   }, [participants])
