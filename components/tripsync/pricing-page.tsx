@@ -317,22 +317,6 @@ export function PricingPage({ tripId, returnTo, sessionId, paid, checkout }: Pri
             >
               <div className="relative w-full max-w-sm">
                 <div
-                  className="absolute inset-x-8 top-10 rounded-[28px] border border-border/50 bg-card/80 p-5 shadow-xl backdrop-blur-sm"
-                  style={{
-                    transform: 'translateY(28px) rotate(-7deg)',
-                    animation: mounted ? 'pricingCardDrift 5s ease-in-out infinite' : 'none',
-                  }}
-                >
-                  <p className="text-sm font-semibold text-foreground">Free</p>
-                  <p className="mt-4 text-4xl font-semibold text-foreground">Shared doc</p>
-                  <div className="mt-6 space-y-2 text-sm text-muted-foreground">
-                    <p>Collect responses</p>
-                    <p>Compare dates</p>
-                    <p>Lock destination</p>
-                  </div>
-                </div>
-
-                <div
                   className="relative rounded-[32px] border border-primary/30 bg-[linear-gradient(180deg,rgba(79,224,188,0.1),rgba(255,255,255,0.94))] p-6 shadow-[0_30px_80px_rgba(61,153,199,0.18)]"
                   style={{ animation: mounted ? 'pricingCardLift 4s ease-in-out infinite' : 'none' }}
                 >
@@ -524,16 +508,6 @@ export function PricingPage({ tripId, returnTo, sessionId, paid, checkout }: Pri
           }
           50% {
             transform: translateY(-16px);
-          }
-        }
-
-        @keyframes pricingCardDrift {
-          0%,
-          100% {
-            transform: translateY(28px) rotate(-7deg);
-          }
-          50% {
-            transform: translateY(8px) rotate(-7deg);
           }
         }
       `}</style>
