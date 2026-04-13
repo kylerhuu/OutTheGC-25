@@ -4,6 +4,7 @@ import { useState, useMemo, useCallback, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import type { DateRange } from 'react-day-picker'
 import { EventTopBar } from '@/components/tripsync/event-top-bar'
+import { CheckoutReturnVerifier } from '@/components/tripsync/checkout-return-verifier'
 import { EventInputPanel } from '@/components/tripsync/event-input-panel'
 import { parseStoredDate, toDateOnlyString } from '@/lib/date-utils'
 import type { CreateResponseInput, PublicResponseRecord, ResponseRecord, TripWithResponses } from '@/lib/trip-types'
@@ -409,6 +410,7 @@ export default function EventPage() {
     <div className="min-h-screen bg-background">
       <div className="mx-auto max-w-4xl px-4 py-6 sm:px-6 lg:px-8">
         <div className="flex flex-col gap-6">
+          <CheckoutReturnVerifier tripId={tripId} />
           {/* Top Bar */}
           <EventTopBar
             tripId={tripId}
@@ -417,7 +419,7 @@ export default function EventPage() {
             responseCount={participants.length}
             shareUrl={shareUrl}
             activeTab="responses"
-            plusHref={`/plus/${tripId}`}
+            plusHref={`/pricing?tripId=${tripId}&returnTo=${encodeURIComponent(`/event/${tripId}`)}`}
           />
 
           <EventInputPanel

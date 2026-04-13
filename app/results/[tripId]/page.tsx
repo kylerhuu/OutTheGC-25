@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { Calendar, DollarSign, Heart, Loader2, MapPin, MessageSquare, Users } from 'lucide-react'
 import { EventTopBar } from '@/components/tripsync/event-top-bar'
+import { CheckoutReturnVerifier } from '@/components/tripsync/checkout-return-verifier'
 import { BestTripOption } from '@/components/tripsync/best-trip-option'
 import { AvailabilityHeatmap } from '@/components/tripsync/availability-heatmap'
 import { EventSummaryPanel } from '@/components/tripsync/event-summary-panel'
@@ -317,6 +318,7 @@ export default function ResultsPage() {
   return (
     <div className="min-h-screen bg-background">
       <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
+        <CheckoutReturnVerifier tripId={tripId} />
         <EventTopBar
           tripId={tripId}
           tripName={trip.name}
@@ -324,7 +326,7 @@ export default function ResultsPage() {
           responseCount={participants.length}
           shareUrl={shareUrl}
           activeTab="results"
-          plusHref={`/plus/${tripId}`}
+          plusHref={`/pricing?tripId=${tripId}&returnTo=${encodeURIComponent(`/results/${tripId}`)}`}
         />
 
         {/* Featured section: Best Trip Option */}

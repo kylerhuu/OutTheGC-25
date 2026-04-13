@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation'
 import { Loader2, Sparkles } from 'lucide-react'
 import { EventTopBar } from '@/components/tripsync/event-top-bar'
 import { FinalDocTab } from '@/components/tripsync/final-doc-tab'
+import { CheckoutReturnVerifier } from '@/components/tripsync/checkout-return-verifier'
 import { TripSnapshot } from '@/components/tripsync/trip-snapshot'
 import { getBestAvailabilitySpans, getBestDateWindows, getTripLengthDays } from '@/lib/availability'
 import { Button } from '@/components/ui/button'
@@ -294,6 +295,7 @@ export default function PlanPage() {
   return (
     <div className="min-h-screen bg-background">
       <div className="mx-auto flex max-w-5xl flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
+        <CheckoutReturnVerifier tripId={tripId} onVerified={() => void loadPlan()} />
         <EventTopBar
           tripId={tripId}
           tripName={data.trip.name}
@@ -301,7 +303,7 @@ export default function PlanPage() {
           responseCount={data.trip.responses.length}
           shareUrl={shareUrl}
           activeTab="plan"
-          plusHref={`/plus/${tripId}`}
+          plusHref={`/pricing?tripId=${tripId}&returnTo=${encodeURIComponent(`/plan/${tripId}`)}`}
         />
         <div className="inline-flex w-fit items-center rounded-2xl border border-border bg-muted/40 p-1 shadow-sm">
           {(['plan', 'final-doc'] as const).map((tab) => (
@@ -371,7 +373,7 @@ export default function PlanPage() {
                     </Button>
                   ) : (
                     <Button asChild>
-                      <a href={`/plus/${tripId}`}>
+                      <a href={`/pricing?tripId=${tripId}&returnTo=${encodeURIComponent(`/plan/${tripId}`)}`}>
                         <Sparkles className="size-4" />
                         Unlock AI with OutTheGC+
                       </a>

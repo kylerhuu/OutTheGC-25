@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { useState } from "react"
 import { CreateTripModal } from "@/components/tripsync/create-trip-modal"
 import { OutTheGCLogo } from "@/components/tripsync/outthegc-logo"
@@ -20,12 +21,20 @@ export default function Home() {
       {/* Nav */}
       <header className="relative z-10 w-full flex items-center justify-between px-6 py-5 max-w-5xl mx-auto">
         <OutTheGCLogo markClassName="h-9 w-9" textClassName="h-7" />
-        <button
-          onClick={() => setModalOpen(true)}
-          className="text-sm font-semibold text-primary hover:text-primary/80 transition-colors duration-150"
-        >
-          Create Trip
-        </button>
+        <div className="flex items-center gap-4">
+          <Link
+            href="/pricing"
+            className="text-sm font-semibold text-foreground hover:text-primary transition-colors duration-150"
+          >
+            Pricing
+          </Link>
+          <button
+            onClick={() => setModalOpen(true)}
+            className="text-sm font-semibold text-primary hover:text-primary/80 transition-colors duration-150"
+          >
+            Create Trip
+          </button>
+        </div>
       </header>
 
       {/* Hero */}
