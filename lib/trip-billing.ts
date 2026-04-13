@@ -19,6 +19,36 @@ export function getBaseUrl() {
   return process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
 }
 
+export function getAllowedAppOrigins() {
+  return Array.from(
+    new Set(
+      [process.env.NEXT_PUBLIC_BASE_URL, 'http://localhost:3000', 'https://outthegc.app', 'https://www.outthegc.app']
+        .filter((value): value is string => Boolean(value))
+        .map((value) => new URL(value).origin),
+    ),
+  )
+}
+
+export function getSafeTripReturnUrl(rawUrl: string, tripId: string) {
+  const parsedUrl = new URL(rawUrl)
+
+  if (!getAllowedAppOrigins().includes(parsedUrl.origin)) {
+    throw new Error('Invalid return URL origin.')
+  }
+
+  const allowedPath = new RegExp(`^/(event|results|plan|plus)/${tripId}(?:/)?$`)
+  if (!allowedPath.test(parsedUrl.pathname)) {
+    throw new Error('Invalid return URL path.')
+  }
+
+  parsedUrl.searchParams.delete('checkout')
+  parsedUrl.searchParams.delete('paid')
+  parsedUrl.searchParams.delete('session_id')
+  parsedUrl.hash = ''
+
+  return parsedUrl.toString()
+}
+
 export function isStripeConfigured() {
   return Boolean(process.env.STRIPE_SECRET_KEY && process.env.STRIPE_PLUS_PRICE_ID)
 }

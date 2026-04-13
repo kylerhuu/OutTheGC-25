@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useParams } from 'next/navigation'
+import { useParams, useSearchParams } from 'next/navigation'
 import { Check, Loader2, Sparkles } from 'lucide-react'
 import { EventTopBar } from '@/components/tripsync/event-top-bar'
 import { Button } from '@/components/ui/button'
@@ -22,6 +22,7 @@ function formatDateRange(from: Date, to: Date) {
 
 export default function PlusPage() {
   const params = useParams()
+  const searchParams = useSearchParams()
   const tripId = params.tripId as string
   const [data, setData] = useState<TripPlanPageData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -30,6 +31,8 @@ export default function PlusPage() {
   const [billingEmail, setBillingEmail] = useState('')
   const [checkoutError, setCheckoutError] = useState<string | null>(null)
   const [isStartingCheckout, setIsStartingCheckout] = useState(false)
+  const [isVerifyingCheckout, setIsVerifyingCheckout] = useState(false)
+  const [checkoutMessage, setCheckoutMessage] = useState<string | null>(null)
 
   useEffect(() => {
     setOwnerToken(readTripOwnerToken(tripId))
@@ -66,16 +69,84 @@ export default function PlusPage() {
   }, [loadPage])
 
   useEffect(() => {
-    if (typeof window === 'undefined') return
-    const checkoutState = new URLSearchParams(window.location.search).get('checkout')
-    if (checkoutState === 'success') {
-      setCheckoutError(null)
-      void loadPage()
-    }
+    const sessionId = searchParams.get('session_id')
+    const checkoutState = searchParams.get('checkout')
+    const paidFlag = searchParams.get('paid')
+
     if (checkoutState === 'canceled') {
+      setCheckoutMessage(null)
       setCheckoutError('Checkout was canceled.')
+      return
     }
-  }, [loadPage])
+
+    if (!sessionId || paidFlag !== 'true') {
+      return
+    }
+
+    let isActive = true
+
+    const verifiedSessionId = sessionId
+
+    async function verifyCheckoutSession() {
+      setIsVerifyingCheckout(true)
+      setCheckoutError(null)
+      setCheckoutMessage('Confirming your payment...')
+
+      try {
+        const response = await fetch(
+          `/api/trips/${tripId}/billing/verify-session?session_id=${encodeURIComponent(verifiedSessionId)}`,
+          { cache: 'no-store' },
+        )
+        const payload = (await response.json()) as {
+          paid?: boolean
+          billing?: TripPlanPageData['billing']
+          error?: string
+        }
+
+        if (!response.ok) {
+          throw new Error(payload.error || 'Unable to verify payment.')
+        }
+
+        if (!isActive) return
+
+        if (payload.paid) {
+          setData((current) =>
+            current && payload.billing
+              ? {
+                  ...current,
+                  billing: payload.billing,
+                }
+              : current,
+          )
+          setCheckoutMessage('Payment confirmed. OutTheGC Plus is unlocked for this trip.')
+          setCheckoutError(null)
+          void loadPage()
+        } else {
+          setCheckoutMessage(null)
+          setCheckoutError('Payment has not completed yet. Refresh in a moment if Stripe just finished.')
+        }
+      } catch (error) {
+        if (!isActive) return
+        setCheckoutMessage(null)
+        setCheckoutError(error instanceof Error ? error.message : 'Unable to verify payment.')
+      } finally {
+        if (isActive) {
+          setIsVerifyingCheckout(false)
+          const nextUrl = new URL(window.location.href)
+          nextUrl.searchParams.delete('session_id')
+          nextUrl.searchParams.delete('paid')
+          nextUrl.searchParams.delete('checkout')
+          window.history.replaceState({}, '', nextUrl.toString())
+        }
+      }
+    }
+
+    void verifyCheckoutSession()
+
+    return () => {
+      isActive = false
+    }
+  }, [loadPage, searchParams, tripId])
 
   const shareUrl = useMemo(() => {
     if (typeof window === 'undefined') {
@@ -100,13 +171,18 @@ export default function PlusPage() {
     setCheckoutError(null)
 
     try {
+      const returnUrl = new URL(window.location.href)
+      returnUrl.searchParams.delete('session_id')
+      returnUrl.searchParams.delete('paid')
+      returnUrl.searchParams.delete('checkout')
+
       const response = await fetch(`/api/trips/${tripId}/billing/checkout`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'x-trip-owner-token': ownerToken,
         },
-        body: JSON.stringify({ email: billingEmail.trim() }),
+        body: JSON.stringify({ email: billingEmail.trim(), returnUrl: returnUrl.toString() }),
       })
 
       const payload = (await response.json()) as { url?: string; error?: string }
@@ -221,13 +297,17 @@ export default function PlusPage() {
                   />
                 </div>
 
-                <Button onClick={() => void startCheckout()} disabled={isStartingCheckout || !data.billing.stripeConfigured || !ownerToken}>
+                <Button
+                  onClick={() => void startCheckout()}
+                  disabled={isStartingCheckout || isVerifyingCheckout || !data.billing.stripeConfigured || !ownerToken}
+                >
                   {isStartingCheckout ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
                   Buy OutTheGC Plus for ${data.billing.priceUsd}
                 </Button>
               </>
             )}
 
+            {checkoutMessage && <p className="text-sm text-foreground">{checkoutMessage}</p>}
             {checkoutError && <p className="text-sm text-destructive">{checkoutError}</p>}
             {!data.billing.stripeConfigured && (
               <p className="text-sm text-destructive">Stripe still needs to be configured before checkout can work.</p>

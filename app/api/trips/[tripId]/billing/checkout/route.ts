@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import { getBaseUrl, isStripeConfigured } from '@/lib/trip-billing'
+import { getBaseUrl, getSafeTripReturnUrl, isStripeConfigured } from '@/lib/trip-billing'
 import { createStripeCheckoutSession, createStripeCustomer } from '@/lib/stripe'
 import { updateTripBillingState, verifyTripOwner } from '@/lib/trip-store'
 
 const requestSchema = z.object({
   email: z.string().trim().email(),
+  returnUrl: z.string().trim().url(),
 })
 
 interface RouteContext {
@@ -27,6 +28,7 @@ export async function POST(request: Request, context: RouteContext) {
     }
 
     const body = requestSchema.parse(await request.json())
+    const returnUrl = getSafeTripReturnUrl(body.returnUrl, tripId)
     const customerId =
       ownerTrip.stripeCustomerId ||
       (
@@ -47,13 +49,19 @@ export async function POST(request: Request, context: RouteContext) {
       stripeCurrentPeriodEnd: ownerTrip.stripeCurrentPeriodEnd,
     })
 
-    const appBaseUrl = getBaseUrl()
+    const successUrl = new URL(returnUrl)
+    successUrl.searchParams.set('session_id', '{CHECKOUT_SESSION_ID}')
+    successUrl.searchParams.set('paid', 'true')
+
+    const cancelUrl = new URL(returnUrl)
+    cancelUrl.searchParams.set('checkout', 'canceled')
+
     const session = await createStripeCheckoutSession({
       customerId,
       tripId,
       tripName: ownerTrip.name,
-      successUrl: `${appBaseUrl}/plus/${tripId}?checkout=success`,
-      cancelUrl: `${appBaseUrl}/plus/${tripId}?checkout=canceled`,
+      successUrl: successUrl.toString(),
+      cancelUrl: cancelUrl.toString(),
     })
 
     if (!session.url) {
@@ -73,6 +81,7 @@ export async function POST(request: Request, context: RouteContext) {
               ? undefined
               : {
                   stripePriceId: configuredPriceId,
+                  appBaseUrl: getBaseUrl(),
                 },
         },
         { status: 400 },
@@ -88,6 +97,7 @@ export async function POST(request: Request, context: RouteContext) {
             ? undefined
             : {
                 stripePriceId: configuredPriceId,
+                appBaseUrl: getBaseUrl(),
               },
       },
       { status: 400 },

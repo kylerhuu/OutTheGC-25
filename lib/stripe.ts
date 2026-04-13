@@ -29,6 +29,27 @@ async function stripeRequest(path: string, params: URLSearchParams) {
   return payload
 }
 
+async function stripeGet(path: string) {
+  const response = await fetch(`https://api.stripe.com/v1/${path}`, {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${getStripeSecretKey()}`,
+    },
+  })
+
+  const payload = await response.json()
+
+  if (!response.ok) {
+    const message =
+      typeof payload?.error?.message === 'string'
+        ? payload.error.message
+        : 'Stripe request failed.'
+    throw new Error(message)
+  }
+
+  return payload
+}
+
 export async function createStripeCustomer(input: { email: string; tripId: string; tripName: string }) {
   const params = new URLSearchParams()
   params.set('email', input.email)
@@ -78,4 +99,21 @@ export async function createStripeBillingPortalSession(input: {
 
   const session = await stripeRequest('billing_portal/sessions', params)
   return session as { url: string }
+}
+
+export async function retrieveStripeCheckoutSession(sessionId: string) {
+  const session = await stripeGet(`checkout/sessions/${encodeURIComponent(sessionId)}`)
+  return session as {
+    id: string
+    payment_status: string
+    customer: string | null
+    customer_details?: {
+      email?: string | null
+    } | null
+    payment_intent?: string | null
+    metadata?: {
+      tripId?: string
+      tripName?: string
+    } | null
+  }
 }
