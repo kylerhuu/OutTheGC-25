@@ -9,6 +9,16 @@ export interface TripRecord {
   interestOptions: string[]
 }
 
+export interface TripBillingRecord {
+  planTier: 'free' | 'plus'
+  subscriptionStatus: string
+  hasActiveSubscription: boolean
+  ownerEmail: string | null
+  currentPeriodEnd: string | null
+  monthlyPriceUsd: number
+  stripeConfigured: boolean
+}
+
 export interface ResponseRecord {
   id: string
   tripId: string
@@ -97,6 +107,7 @@ export interface TripPlanPageData {
   trip: TripWithResponses
   plan: TripPlanRecord
   suggestions: TripPlanSuggestions
+  billing: TripBillingRecord
 }
 
 export interface CreateTripInput {
@@ -104,6 +115,11 @@ export interface CreateTripInput {
   description?: string
   startDate: string
   endDate: string
+}
+
+export interface CreateTripResult {
+  trip: TripRecord
+  ownerToken: string
 }
 
 export interface CreateResponseInput {

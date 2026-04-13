@@ -67,6 +67,25 @@ export default function Home() {
         </div>
       </section>
 
+      <section className="relative z-10 px-6 pb-24">
+        <div className="mx-auto grid max-w-5xl gap-5 md:grid-cols-2">
+          <div className="rounded-[28px] border border-border/60 bg-card/90 p-6 shadow-sm backdrop-blur">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Free</p>
+            <h2 className="mt-3 text-2xl font-semibold text-foreground">Shared planning doc</h2>
+            <p className="mt-3 text-sm leading-6 text-muted-foreground">
+              Create a trip, collect responses, lock dates and destination, and use the planning page like a group Google Doc.
+            </p>
+          </div>
+          <div className="rounded-[28px] border border-primary/30 bg-primary/10 p-6 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">OutTheGC+</p>
+            <h2 className="mt-3 text-2xl font-semibold text-foreground">$5/month for AI planning</h2>
+            <p className="mt-3 text-sm leading-6 text-muted-foreground">
+              Unlock AI cleanup for messy notes and one-click final-doc organization so the subscription covers API costs.
+            </p>
+          </div>
+        </div>
+      </section>
+
       {/* Footer */}
       <footer className="relative z-10 text-center text-xs text-muted-foreground py-6 border-t border-border">
         © {new Date().getFullYear()} OutTheGC. Finally get your trip out of the gc.

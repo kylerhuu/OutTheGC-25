@@ -13,6 +13,14 @@ model Trip {
   description        String
   startDate          String
   endDate            String
+  ownerTokenHash     String?
+  ownerEmail         String?
+  planTier           String            @default("free")
+  stripeCustomerId   String?           @unique
+  stripeSubscriptionId String?         @unique
+  stripePriceId      String?
+  stripeSubscriptionStatus String      @default("inactive")
+  stripeCurrentPeriodEnd DateTime?
   createdAt          DateTime          @default(now())
   responses          TripResponse[]
   destinationOptions TripDestination[]

@@ -5,6 +5,7 @@ import { ExternalLink, RotateCcw, X } from "lucide-react"
 import { CopyButton } from "@/components/tripsync/copy-button"
 import { OutTheGCLogo } from "@/components/tripsync/outthegc-logo"
 import type { TripRecord } from "@/lib/trip-types"
+import { storeTripOwnerToken } from "@/lib/trip-owner"
 
 interface CreateTripModalProps {
   open: boolean
@@ -129,9 +130,9 @@ export function CreateTripModal({ open, onClose }: CreateTripModalProps) {
         }),
       })
 
-      const data = (await response.json()) as { trip?: TripRecord; error?: string }
+      const data = (await response.json()) as { trip?: TripRecord; ownerToken?: string; error?: string }
 
-      if (!response.ok || !data.trip) {
+      if (!response.ok || !data.trip || !data.ownerToken) {
         throw new Error(data.error || "Unable to create trip.")
       }
 
@@ -140,6 +141,7 @@ export function CreateTripModal({ open, onClose }: CreateTripModalProps) {
       setLink(nextLink)
       setGenerated(true)
       setRecentTrip({ tripName: data.trip.name, link: nextLink })
+      storeTripOwnerToken(data.trip.id, data.ownerToken)
       window.localStorage.removeItem(TRIP_DRAFT_KEY)
       window.localStorage.setItem(
         RECENT_TRIP_KEY,

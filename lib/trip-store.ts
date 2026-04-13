@@ -1,13 +1,22 @@
 import { prisma } from '@/lib/prisma'
 import { parseComparableDate, toDateOnlyString } from '@/lib/date-utils'
 import { getBestAvailabilitySpans, getBestDateWindows, getTripLengthDays } from '@/lib/availability'
+import {
+  OUTTHEGC_PLUS_MONTHLY_PRICE_USD,
+  generateTripOwnerToken,
+  hashTripOwnerToken,
+  isStripeConfigured,
+  isTripSubscriptionActive,
+} from '@/lib/trip-billing'
 import type {
   CreateResponseInput,
+  CreateTripResult,
   CreateTripInput,
   CreateTripPlanTodoInput,
   PublicResponseRecord,
   RecoverResponseInput,
   ResponseRecord,
+  TripBillingRecord,
   TripPlanPageData,
   TripPlanRecord,
   TripPlanSuggestions,
@@ -147,6 +156,26 @@ function mapTripRecord(trip: {
     createdAt: trip.createdAt.toISOString(),
     destinationOptions: trip.destinationOptions?.map((option) => option.name) ?? [],
     interestOptions: trip.interestOptions?.map((option) => option.name) ?? [],
+  }
+}
+
+function mapTripBillingRecord(trip: {
+  ownerEmail: string | null
+  planTier: string
+  stripeSubscriptionStatus: string
+  stripeCurrentPeriodEnd: Date | null
+}): TripBillingRecord {
+  const hasActiveSubscription =
+    trip.planTier === 'plus' && isTripSubscriptionActive(trip.stripeSubscriptionStatus)
+
+  return {
+    planTier: hasActiveSubscription ? 'plus' : 'free',
+    subscriptionStatus: trip.stripeSubscriptionStatus,
+    hasActiveSubscription,
+    ownerEmail: trip.ownerEmail,
+    currentPeriodEnd: trip.stripeCurrentPeriodEnd?.toISOString() ?? null,
+    monthlyPriceUsd: OUTTHEGC_PLUS_MONTHLY_PRICE_USD,
+    stripeConfigured: isStripeConfigured(),
   }
 }
 
@@ -466,7 +495,7 @@ async function ensureTripPlan(tripId: string) {
   }
 }
 
-export async function createTrip(input: CreateTripInput): Promise<TripRecord> {
+export async function createTrip(input: CreateTripInput): Promise<CreateTripResult> {
   const name = input.name.trim()
 
   if (!name) {
@@ -484,6 +513,8 @@ export async function createTrip(input: CreateTripInput): Promise<TripRecord> {
     throw new Error('Start date must be before end date.')
   }
 
+  const ownerToken = generateTripOwnerToken()
+
   const trip = await prisma.trip.create({
     data: {
       id: generateId(10),
@@ -491,6 +522,9 @@ export async function createTrip(input: CreateTripInput): Promise<TripRecord> {
       description: input.description?.trim() || '',
       startDate: input.startDate,
       endDate: input.endDate,
+      ownerTokenHash: hashTripOwnerToken(ownerToken),
+      planTier: 'free',
+      stripeSubscriptionStatus: 'inactive',
     },
     include: {
       destinationOptions: true,
@@ -498,7 +532,10 @@ export async function createTrip(input: CreateTripInput): Promise<TripRecord> {
     },
   })
 
-  return mapTripRecord(trip)
+  return {
+    trip: mapTripRecord(trip),
+    ownerToken,
+  }
 }
 
 export async function getTripWithResponses(tripId: string): Promise<TripWithResponses | null> {
@@ -856,7 +893,138 @@ export async function getTripPlanPageData(tripId: string): Promise<TripPlanPageD
     trip: tripWithResponses,
     plan: mapTripPlanRecord(trip.plan),
     suggestions: buildTripPlanSuggestions(tripWithResponses),
+    billing: mapTripBillingRecord(trip),
   }
+}
+
+export async function getTripBillingRecord(tripId: string): Promise<TripBillingRecord | null> {
+  const trip = await prisma.trip.findUnique({
+    where: { id: tripId },
+    select: {
+      ownerEmail: true,
+      planTier: true,
+      stripeSubscriptionStatus: true,
+      stripeCurrentPeriodEnd: true,
+    },
+  })
+
+  if (!trip) {
+    return null
+  }
+
+  return mapTripBillingRecord(trip)
+}
+
+export async function verifyTripOwner(tripId: string, ownerToken: string) {
+  const normalizedToken = ownerToken.trim()
+
+  if (!normalizedToken) {
+    return null
+  }
+
+  const trip = await prisma.trip.findUnique({
+    where: { id: tripId },
+    select: {
+      id: true,
+      name: true,
+      ownerTokenHash: true,
+      ownerEmail: true,
+      planTier: true,
+      stripeCustomerId: true,
+      stripeSubscriptionId: true,
+      stripePriceId: true,
+      stripeSubscriptionStatus: true,
+      stripeCurrentPeriodEnd: true,
+    },
+  })
+
+  if (!trip?.ownerTokenHash) {
+    return null
+  }
+
+  return hashTripOwnerToken(normalizedToken) === trip.ownerTokenHash ? trip : null
+}
+
+export async function tripHasOutTheGcPlus(tripId: string) {
+  const trip = await prisma.trip.findUnique({
+    where: { id: tripId },
+    select: {
+      planTier: true,
+      stripeSubscriptionStatus: true,
+    },
+  })
+
+  if (!trip) {
+    return false
+  }
+
+  return trip.planTier === 'plus' && isTripSubscriptionActive(trip.stripeSubscriptionStatus)
+}
+
+export async function updateTripBillingState(input: {
+  tripId: string
+  ownerEmail?: string | null
+  stripeCustomerId?: string | null
+  stripeSubscriptionId?: string | null
+  stripePriceId?: string | null
+  stripeSubscriptionStatus?: string | null
+  stripeCurrentPeriodEnd?: Date | null
+}) {
+  const nextStatus = input.stripeSubscriptionStatus ?? null
+  const hasActiveSubscription = isTripSubscriptionActive(nextStatus)
+
+  await prisma.trip.update({
+    where: { id: input.tripId },
+    data: {
+      ownerEmail: input.ownerEmail ?? undefined,
+      stripeCustomerId: input.stripeCustomerId ?? undefined,
+      stripeSubscriptionId: input.stripeSubscriptionId ?? undefined,
+      stripePriceId: input.stripePriceId ?? undefined,
+      stripeSubscriptionStatus: nextStatus ?? undefined,
+      stripeCurrentPeriodEnd:
+        input.stripeCurrentPeriodEnd === undefined ? undefined : input.stripeCurrentPeriodEnd,
+      planTier: hasActiveSubscription ? 'plus' : 'free',
+    },
+  })
+}
+
+export async function updateTripBillingStateByStripeReference(input: {
+  tripId?: string | null
+  stripeCustomerId?: string | null
+  stripeSubscriptionId?: string | null
+  ownerEmail?: string | null
+  stripePriceId?: string | null
+  stripeSubscriptionStatus?: string | null
+  stripeCurrentPeriodEnd?: Date | null
+}) {
+  const trip = await prisma.trip.findFirst({
+    where: input.tripId
+      ? { id: input.tripId }
+      : input.stripeSubscriptionId
+        ? { stripeSubscriptionId: input.stripeSubscriptionId }
+        : input.stripeCustomerId
+          ? { stripeCustomerId: input.stripeCustomerId }
+          : { id: '__missing__' },
+    select: {
+      id: true,
+    },
+  })
+
+  if (!trip) {
+    return null
+  }
+
+  await updateTripBillingState({
+    tripId: trip.id,
+    ownerEmail: input.ownerEmail,
+    stripeCustomerId: input.stripeCustomerId,
+    stripeSubscriptionId: input.stripeSubscriptionId,
+    stripePriceId: input.stripePriceId,
+    stripeSubscriptionStatus: input.stripeSubscriptionStatus,
+    stripeCurrentPeriodEnd: input.stripeCurrentPeriodEnd,
+  })
+
+  return trip.id
 }
 
 export async function updateTripPlan(tripId: string, input: UpdateTripPlanInput): Promise<TripPlanRecord> {

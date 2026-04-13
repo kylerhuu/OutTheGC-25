@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { buildFinalDocContent } from '@/lib/final-doc'
+import { OUTTHEGC_PLUS_REQUIRED_CODE } from '@/lib/trip-billing'
 import { getTripPlanPageData, updateTripPlan } from '@/lib/trip-store'
+import { tripHasOutTheGcPlus } from '@/lib/trip-store'
 
 interface RouteContext {
   params: Promise<{ tripId: string }>
@@ -9,6 +11,18 @@ interface RouteContext {
 export async function POST(_: Request, context: RouteContext) {
   try {
     const { tripId } = await context.params
+    const hasPlus = await tripHasOutTheGcPlus(tripId)
+
+    if (!hasPlus) {
+      return NextResponse.json(
+        {
+          error: 'AI final-doc organization is part of OutTheGC+.',
+          code: OUTTHEGC_PLUS_REQUIRED_CODE,
+        },
+        { status: 402 },
+      )
+    }
+
     const data = await getTripPlanPageData(tripId)
 
     if (!data) {
@@ -18,8 +32,7 @@ export async function POST(_: Request, context: RouteContext) {
     const fallbackContent = buildFinalDocContent(data.trip, data.plan)
 
     if (!process.env.OPENAI_API_KEY) {
-      const plan = await updateTripPlan(tripId, { finalDocContent: fallbackContent })
-      return NextResponse.json({ plan, usedFallback: true })
+      return NextResponse.json({ error: 'OPENAI_API_KEY is not set.' }, { status: 500 })
     }
 
     const prompt = [

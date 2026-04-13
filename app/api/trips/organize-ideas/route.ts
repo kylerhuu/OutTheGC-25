@@ -1,7 +1,10 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
+import { OUTTHEGC_PLUS_REQUIRED_CODE } from '@/lib/trip-billing'
+import { tripHasOutTheGcPlus } from '@/lib/trip-store'
 
 const requestSchema = z.object({
+  tripId: z.string().trim().min(1),
   text: z.string().trim().min(1).max(20000),
   mode: z.enum(['organize', 'build_itinerary']).default('organize'),
   intent: z
@@ -70,6 +73,17 @@ const organizedIdeasSchema = z.object({
 export async function POST(request: Request) {
   try {
     const body = requestSchema.parse(await request.json())
+    const hasPlus = await tripHasOutTheGcPlus(body.tripId)
+
+    if (!hasPlus) {
+      return NextResponse.json(
+        {
+          error: 'Trip Copilot is part of OutTheGC+.',
+          code: OUTTHEGC_PLUS_REQUIRED_CODE,
+        },
+        { status: 402 },
+      )
+    }
 
     if (!process.env.OPENAI_API_KEY) {
       return NextResponse.json(
