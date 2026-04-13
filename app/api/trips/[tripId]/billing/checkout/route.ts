@@ -52,8 +52,8 @@ export async function POST(request: Request, context: RouteContext) {
       customerId,
       tripId,
       tripName: ownerTrip.name,
-      successUrl: `${appBaseUrl}/plan/${tripId}?checkout=success`,
-      cancelUrl: `${appBaseUrl}/plan/${tripId}?checkout=canceled`,
+      successUrl: `${appBaseUrl}/plus/${tripId}?checkout=success`,
+      cancelUrl: `${appBaseUrl}/plus/${tripId}?checkout=canceled`,
     })
 
     if (!session.url) {

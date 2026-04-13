@@ -52,7 +52,7 @@ export async function createStripeCheckoutSession(input: {
   }
 
   const params = new URLSearchParams()
-  params.set('mode', 'subscription')
+  params.set('mode', 'payment')
   params.set('customer', input.customerId)
   params.set('success_url', input.successUrl)
   params.set('cancel_url', input.cancelUrl)
@@ -61,8 +61,8 @@ export async function createStripeCheckoutSession(input: {
   params.set('line_items[0][quantity]', '1')
   params.set('metadata[tripId]', input.tripId)
   params.set('metadata[tripName]', input.tripName)
-  params.set('subscription_data[metadata][tripId]', input.tripId)
-  params.set('subscription_data[metadata][tripName]', input.tripName)
+  params.set('payment_intent_data[metadata][tripId]', input.tripId)
+  params.set('payment_intent_data[metadata][tripName]', input.tripName)
 
   const session = await stripeRequest('checkout/sessions', params)
   return session as { url: string | null }

@@ -417,6 +417,7 @@ export default function EventPage() {
             responseCount={participants.length}
             shareUrl={shareUrl}
             activeTab="responses"
+            plusHref={`/plus/${tripId}`}
           />
 
           <EventInputPanel

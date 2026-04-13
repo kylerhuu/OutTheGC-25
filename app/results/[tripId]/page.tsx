@@ -324,6 +324,7 @@ export default function ResultsPage() {
           responseCount={participants.length}
           shareUrl={shareUrl}
           activeTab="results"
+          plusHref={`/plus/${tripId}`}
         />
 
         {/* Featured section: Best Trip Option */}

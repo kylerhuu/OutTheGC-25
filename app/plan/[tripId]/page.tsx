@@ -9,18 +9,11 @@ import { TripSnapshot } from '@/components/tripsync/trip-snapshot'
 import { getBestAvailabilitySpans, getBestDateWindows, getTripLengthDays } from '@/lib/availability'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
 import { Textarea } from '@/components/ui/textarea'
 import { buildFinalDocContent } from '@/lib/final-doc'
 import { parseStoredDate } from '@/lib/date-utils'
-import { readTripOwnerToken } from '@/lib/trip-owner'
-import type {
-  TripBillingRecord,
-  TripPlanPageData,
-  TripPlanRecord,
-  UpdateTripPlanInput,
-} from '@/lib/trip-types'
+import type { TripPlanPageData, TripPlanRecord, UpdateTripPlanInput } from '@/lib/trip-types'
 
 interface PlanPayload extends Partial<TripPlanPageData> {
   error?: string
@@ -77,14 +70,6 @@ export default function PlanPage() {
   const [activePlannerTab, setActivePlannerTab] = useState<'plan' | 'final-doc'>('plan')
   const [isOrganizing, setIsOrganizing] = useState(false)
   const [tripLengthDays, setTripLengthDays] = useState(4)
-  const [ownerToken, setOwnerToken] = useState<string | null>(null)
-  const [billingEmail, setBillingEmail] = useState('')
-  const [isStartingCheckout, setIsStartingCheckout] = useState(false)
-  const [isOpeningPortal, setIsOpeningPortal] = useState(false)
-
-  useEffect(() => {
-    setOwnerToken(readTripOwnerToken(tripId))
-  }, [tripId])
 
   const loadPlan = useCallback(async () => {
     setIsLoading(true)
@@ -104,7 +89,6 @@ export default function PlanPage() {
         suggestions: payload.suggestions,
         billing: payload.billing,
       })
-      setBillingEmail(payload.billing.ownerEmail || '')
       setDraft({
         finalDestination: payload.plan.finalDestination,
         finalStartDate: payload.plan.finalStartDate,
@@ -129,18 +113,6 @@ export default function PlanPage() {
 
   useEffect(() => {
     void loadPlan()
-  }, [loadPlan])
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    const checkoutState = new URLSearchParams(window.location.search).get('checkout')
-    if (checkoutState === 'success') {
-      setSaveMessage('Checkout finished. Refreshing billing status...')
-      void loadPlan()
-    }
-    if (checkoutState === 'canceled') {
-      setSaveError('Checkout was canceled.')
-    }
   }, [loadPlan])
 
   const shareUrl = useMemo(() => {
@@ -290,75 +262,6 @@ export default function PlanPage() {
     await savePlan(nextDraft)
   }
 
-  const startCheckout = useCallback(async () => {
-    if (!ownerToken) {
-      setSaveError('Billing can only be managed from the browser that created this trip.')
-      return
-    }
-
-    if (!billingEmail.trim()) {
-      setSaveError('Enter an email for Stripe receipts and billing access.')
-      return
-    }
-
-    setIsStartingCheckout(true)
-    setSaveError(null)
-
-    try {
-      const response = await fetch(`/api/trips/${tripId}/billing/checkout`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-trip-owner-token': ownerToken,
-        },
-        body: JSON.stringify({ email: billingEmail.trim() }),
-      })
-
-      const payload = (await response.json()) as { url?: string; error?: string }
-
-      if (!response.ok || !payload.url) {
-        throw new Error(payload.error || 'Unable to start checkout.')
-      }
-
-      window.location.href = payload.url
-    } catch (error) {
-      setSaveError(error instanceof Error ? error.message : 'Unable to start checkout.')
-    } finally {
-      setIsStartingCheckout(false)
-    }
-  }, [billingEmail, ownerToken, tripId])
-
-  const openBillingPortal = useCallback(async () => {
-    if (!ownerToken) {
-      setSaveError('Billing can only be managed from the browser that created this trip.')
-      return
-    }
-
-    setIsOpeningPortal(true)
-    setSaveError(null)
-
-    try {
-      const response = await fetch(`/api/trips/${tripId}/billing/portal`, {
-        method: 'POST',
-        headers: {
-          'x-trip-owner-token': ownerToken,
-        },
-      })
-
-      const payload = (await response.json()) as { url?: string; error?: string }
-
-      if (!response.ok || !payload.url) {
-        throw new Error(payload.error || 'Unable to open billing portal.')
-      }
-
-      window.location.href = payload.url
-    } catch (error) {
-      setSaveError(error instanceof Error ? error.message : 'Unable to open billing portal.')
-    } finally {
-      setIsOpeningPortal(false)
-    }
-  }, [ownerToken, tripId])
-
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background">
@@ -398,6 +301,7 @@ export default function PlanPage() {
           responseCount={data.trip.responses.length}
           shareUrl={shareUrl}
           activeTab="plan"
+          plusHref={`/plus/${tripId}`}
         />
         <div className="inline-flex w-fit items-center rounded-2xl border border-border bg-muted/40 p-1 shadow-sm">
           {(['plan', 'final-doc'] as const).map((tab) => (
@@ -428,17 +332,6 @@ export default function PlanPage() {
             </CardHeader>
 
             <CardContent className="space-y-8">
-              <BillingCard
-                billing={data.billing}
-                billingEmail={billingEmail}
-                isOwner={Boolean(ownerToken)}
-                isStartingCheckout={isStartingCheckout}
-                isOpeningPortal={isOpeningPortal}
-                onBillingEmailChange={setBillingEmail}
-                onStartCheckout={() => void startCheckout()}
-                onOpenPortal={() => void openBillingPortal()}
-              />
-
               <TripSnapshot
                 trip={data.trip}
                 plan={{
@@ -464,22 +357,24 @@ export default function PlanPage() {
                 <div>
                   <p className="text-sm font-semibold text-foreground">Working trip doc</p>
                   <p className="text-sm text-muted-foreground">
-                    Free tier: use this like a shared Google Doc. OutTheGC+ unlocks AI organization into the Final Doc.
+                    Keep rough notes here while the group is figuring things out. When it feels ready, organize it into the Final Doc.
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <Button variant="outline" onClick={() => void handleSavePlan()} disabled={isSaving}>
                     {isSaving ? <Spinner className="size-4" /> : 'Save notes'}
                   </Button>
-                  {data.billing.hasActiveSubscription ? (
+                  {data.billing.hasPlusAccess ? (
                     <Button onClick={() => void handleOrganizeIntoFinalDoc()} disabled={isOrganizing}>
                       {isOrganizing ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
                       Organize into Final Doc
                     </Button>
                   ) : (
-                    <Button onClick={() => void startCheckout()} disabled={isStartingCheckout || !data.billing.stripeConfigured}>
-                      {isStartingCheckout ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
-                      Unlock AI with OutTheGC+
+                    <Button asChild>
+                      <a href={`/plus/${tripId}`}>
+                        <Sparkles className="size-4" />
+                        Unlock AI with OutTheGC+
+                      </a>
                     </Button>
                   )}
                 </div>
@@ -510,101 +405,6 @@ export default function PlanPage() {
               )}
             </CardContent>
           </Card>
-        )}
-      </div>
-    </div>
-  )
-}
-
-function BillingCard({
-  billing,
-  billingEmail,
-  isOwner,
-  isStartingCheckout,
-  isOpeningPortal,
-  onBillingEmailChange,
-  onStartCheckout,
-  onOpenPortal,
-}: {
-  billing: TripBillingRecord
-  billingEmail: string
-  isOwner: boolean
-  isStartingCheckout: boolean
-  isOpeningPortal: boolean
-  onBillingEmailChange: (value: string) => void
-  onStartCheckout: () => void
-  onOpenPortal: () => void
-}) {
-  if (billing.hasActiveSubscription) {
-    return (
-      <div className="rounded-3xl border border-emerald-500/20 bg-emerald-500/5 p-5">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div>
-            <p className="text-sm font-semibold text-foreground">OutTheGC+ active</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              AI planning and final-doc organization are unlocked for this trip.
-            </p>
-            {billing.currentPeriodEnd && (
-              <p className="mt-2 text-xs text-muted-foreground">
-                Current access runs through {new Date(billing.currentPeriodEnd).toLocaleDateString('en-US')}.
-              </p>
-            )}
-          </div>
-          <Button variant="outline" onClick={onOpenPortal} disabled={!isOwner || isOpeningPortal}>
-            {isOpeningPortal ? <Loader2 className="size-4 animate-spin" /> : 'Manage billing'}
-          </Button>
-        </div>
-      </div>
-    )
-  }
-
-  return (
-    <div className="rounded-3xl border border-primary/20 bg-gradient-to-r from-primary/10 via-background to-fuchsia-500/10 p-5">
-      <div className="flex flex-col gap-5">
-        <div>
-          <p className="text-sm font-semibold text-foreground">Free vs OutTheGC+</p>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Free keeps the shared planning doc. OutTheGC+ is ${billing.monthlyPriceUsd}/month for AI trip cleanup and final-doc generation.
-          </p>
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-2">
-          <div className="rounded-2xl border border-border/60 bg-background/80 p-4">
-            <p className="text-sm font-semibold text-foreground">Free</p>
-            <p className="mt-2 text-sm text-muted-foreground">Manual trip doc, destination/date locking, sharing, and editable final doc.</p>
-          </div>
-          <div className="rounded-2xl border border-primary/30 bg-primary/5 p-4">
-            <p className="text-sm font-semibold text-foreground">OutTheGC+</p>
-            <p className="mt-2 text-sm text-muted-foreground">AI organization for planning notes and one-click final-doc cleanup.</p>
-          </div>
-        </div>
-
-        <div className="flex flex-col gap-3 md:flex-row md:items-end">
-          <div className="flex-1">
-            <label htmlFor="billing-email" className="mb-2 block text-sm font-medium text-foreground">
-              Billing email
-            </label>
-            <Input
-              id="billing-email"
-              type="email"
-              value={billingEmail}
-              onChange={(event) => onBillingEmailChange(event.target.value)}
-              placeholder="you@example.com"
-              disabled={!billing.stripeConfigured || !isOwner}
-            />
-          </div>
-          <Button onClick={onStartCheckout} disabled={!billing.stripeConfigured || !isOwner || isStartingCheckout}>
-            {isStartingCheckout ? <Loader2 className="size-4 animate-spin" /> : 'Upgrade to OutTheGC+'}
-          </Button>
-        </div>
-
-        {!billing.stripeConfigured && (
-          <p className="text-xs text-destructive">Stripe is not configured yet. Add the Stripe env vars before selling OutTheGC+.</p>
-        )}
-        {!isOwner && (
-          <p className="text-xs text-muted-foreground">
-            Billing is only available in the browser session that originally created this trip.
-          </p>
         )}
       </div>
     </div>

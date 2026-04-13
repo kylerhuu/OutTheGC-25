@@ -78,7 +78,7 @@ export default function Home() {
           </div>
           <div className="rounded-[28px] border border-primary/30 bg-primary/10 p-6 shadow-sm">
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">OutTheGC+</p>
-            <h2 className="mt-3 text-2xl font-semibold text-foreground">$5/month for AI planning</h2>
+            <h2 className="mt-3 text-2xl font-semibold text-foreground">$5 one-time for AI planning</h2>
             <p className="mt-3 text-sm leading-6 text-muted-foreground">
               Unlock AI cleanup for messy notes and one-click final-doc organization so the subscription covers API costs.
             </p>

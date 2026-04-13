@@ -2,11 +2,11 @@ import { prisma } from '@/lib/prisma'
 import { parseComparableDate, toDateOnlyString } from '@/lib/date-utils'
 import { getBestAvailabilitySpans, getBestDateWindows, getTripLengthDays } from '@/lib/availability'
 import {
-  OUTTHEGC_PLUS_MONTHLY_PRICE_USD,
+  OUTTHEGC_PLUS_PRICE_USD,
   generateTripOwnerToken,
+  hasTripPlusAccess,
   hashTripOwnerToken,
   isStripeConfigured,
-  isTripSubscriptionActive,
 } from '@/lib/trip-billing'
 import type {
   CreateResponseInput,
@@ -165,16 +165,15 @@ function mapTripBillingRecord(trip: {
   stripeSubscriptionStatus: string
   stripeCurrentPeriodEnd: Date | null
 }): TripBillingRecord {
-  const hasActiveSubscription =
-    trip.planTier === 'plus' && isTripSubscriptionActive(trip.stripeSubscriptionStatus)
+  const plusAccess = hasTripPlusAccess(trip.planTier, trip.stripeSubscriptionStatus)
 
   return {
-    planTier: hasActiveSubscription ? 'plus' : 'free',
-    subscriptionStatus: trip.stripeSubscriptionStatus,
-    hasActiveSubscription,
+    planTier: plusAccess ? 'plus' : 'free',
+    paymentStatus: trip.stripeSubscriptionStatus,
+    hasPlusAccess: plusAccess,
     ownerEmail: trip.ownerEmail,
     currentPeriodEnd: trip.stripeCurrentPeriodEnd?.toISOString() ?? null,
-    monthlyPriceUsd: OUTTHEGC_PLUS_MONTHLY_PRICE_USD,
+    priceUsd: OUTTHEGC_PLUS_PRICE_USD,
     stripeConfigured: isStripeConfigured(),
   }
 }
@@ -958,7 +957,7 @@ export async function tripHasOutTheGcPlus(tripId: string) {
     return false
   }
 
-  return trip.planTier === 'plus' && isTripSubscriptionActive(trip.stripeSubscriptionStatus)
+  return hasTripPlusAccess(trip.planTier, trip.stripeSubscriptionStatus)
 }
 
 export async function updateTripBillingState(input: {
@@ -971,7 +970,7 @@ export async function updateTripBillingState(input: {
   stripeCurrentPeriodEnd?: Date | null
 }) {
   const nextStatus = input.stripeSubscriptionStatus ?? null
-  const hasActiveSubscription = isTripSubscriptionActive(nextStatus)
+  const plusAccess = hasTripPlusAccess(input.stripeSubscriptionStatus ? 'plus' : null, nextStatus)
 
   await prisma.trip.update({
     where: { id: input.tripId },
@@ -983,7 +982,7 @@ export async function updateTripBillingState(input: {
       stripeSubscriptionStatus: nextStatus ?? undefined,
       stripeCurrentPeriodEnd:
         input.stripeCurrentPeriodEnd === undefined ? undefined : input.stripeCurrentPeriodEnd,
-      planTier: hasActiveSubscription ? 'plus' : 'free',
+      planTier: plusAccess ? 'plus' : 'free',
     },
   })
 }

@@ -12,10 +12,6 @@ function getStringValue(record: Record<string, unknown>, key: string) {
   return typeof value === 'string' ? value : null
 }
 
-function toDateFromUnix(timestamp: unknown) {
-  return typeof timestamp === 'number' ? new Date(timestamp * 1000) : null
-}
-
 export async function POST(request: Request) {
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET
 
@@ -40,35 +36,15 @@ export async function POST(request: Request) {
   const object = event.data?.object ?? {}
   const metadata = getObjectValue(object, 'metadata')
   const customerDetails = getObjectValue(object, 'customer_details')
-  const items = getObjectValue(object, 'items')
-  const itemData = items && Array.isArray(items.data) ? items.data : []
-  const firstItem = itemData.length > 0 && itemData[0] && typeof itemData[0] === 'object'
-    ? (itemData[0] as Record<string, unknown>)
-    : null
-  const price = firstItem ? getObjectValue(firstItem, 'price') : null
 
   try {
     if (event.type === 'checkout.session.completed') {
       await updateTripBillingStateByStripeReference({
         tripId: metadata ? getStringValue(metadata, 'tripId') : null,
         stripeCustomerId: getStringValue(object, 'customer'),
-        stripeSubscriptionId: getStringValue(object, 'subscription'),
+        stripeSubscriptionId: getStringValue(object, 'payment_intent'),
         ownerEmail: customerDetails ? getStringValue(customerDetails, 'email') : null,
-      })
-    }
-
-    if (
-      event.type === 'customer.subscription.created' ||
-      event.type === 'customer.subscription.updated' ||
-      event.type === 'customer.subscription.deleted'
-    ) {
-      await updateTripBillingStateByStripeReference({
-        tripId: metadata ? getStringValue(metadata, 'tripId') : null,
-        stripeCustomerId: getStringValue(object, 'customer'),
-        stripeSubscriptionId: getStringValue(object, 'id'),
-        stripePriceId: price ? getStringValue(price, 'id') : null,
-        stripeSubscriptionStatus: getStringValue(object, 'status'),
-        stripeCurrentPeriodEnd: toDateFromUnix(object.current_period_end),
+        stripeSubscriptionStatus: 'paid',
       })
     }
 

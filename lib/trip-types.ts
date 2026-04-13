@@ -11,11 +11,11 @@ export interface TripRecord {
 
 export interface TripBillingRecord {
   planTier: 'free' | 'plus'
-  subscriptionStatus: string
-  hasActiveSubscription: boolean
+  paymentStatus: string
+  hasPlusAccess: boolean
   ownerEmail: string | null
   currentPeriodEnd: string | null
-  monthlyPriceUsd: number
+  priceUsd: number
   stripeConfigured: boolean
 }
 

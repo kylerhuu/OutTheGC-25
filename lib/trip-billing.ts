@@ -1,6 +1,6 @@
 import crypto from 'crypto'
 
-export const OUTTHEGC_PLUS_MONTHLY_PRICE_USD = 5
+export const OUTTHEGC_PLUS_PRICE_USD = 5
 export const OUTTHEGC_PLUS_REQUIRED_CODE = 'OUTTHEGC_PLUS_REQUIRED'
 
 export function generateTripOwnerToken() {
@@ -11,8 +11,8 @@ export function hashTripOwnerToken(token: string) {
   return crypto.createHash('sha256').update(token).digest('hex')
 }
 
-export function isTripSubscriptionActive(status: string | null | undefined) {
-  return status === 'active' || status === 'trialing'
+export function hasTripPlusAccess(planTier: string | null | undefined, status: string | null | undefined) {
+  return planTier === 'plus' || status === 'paid' || status === 'active' || status === 'trialing'
 }
 
 export function getBaseUrl() {

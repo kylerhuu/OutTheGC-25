@@ -12,6 +12,7 @@ interface EventTopBarProps {
   responseCount: number
   shareUrl: string
   activeTab?: 'responses' | 'results' | 'plan'
+  plusHref?: string
 }
 
 export function EventTopBar({
@@ -21,6 +22,7 @@ export function EventTopBar({
   responseCount,
   shareUrl,
   activeTab = 'responses',
+  plusHref,
 }: EventTopBarProps) {
   const tabs = [
     { key: 'responses', label: 'Responses', href: `/event/${tripId}` },
@@ -67,7 +69,17 @@ export function EventTopBar({
         </div>
 
         <div className="shrink-0">
-          <CopyButton textToCopy={shareUrl} />
+          <div className="flex flex-wrap justify-end gap-2">
+            {plusHref ? (
+              <Link
+                href={plusHref}
+                className="inline-flex h-10 items-center rounded-xl border border-primary/30 bg-primary/10 px-4 text-sm font-semibold text-foreground transition hover:bg-primary/15"
+              >
+                OutTheGC Plus
+              </Link>
+            ) : null}
+            <CopyButton textToCopy={shareUrl} />
+          </div>
         </div>
       </div>
     </header>
