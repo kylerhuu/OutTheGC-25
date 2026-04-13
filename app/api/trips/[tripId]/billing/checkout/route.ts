@@ -49,19 +49,15 @@ export async function POST(request: Request, context: RouteContext) {
       stripeCurrentPeriodEnd: ownerTrip.stripeCurrentPeriodEnd,
     })
 
-    const successUrl = new URL(returnUrl)
-    successUrl.searchParams.set('session_id', '{CHECKOUT_SESSION_ID}')
-    successUrl.searchParams.set('paid', 'true')
-
-    const cancelUrl = new URL(returnUrl)
-    cancelUrl.searchParams.set('checkout', 'canceled')
+    const successUrl = `${returnUrl}${returnUrl.includes('?') ? '&' : '?'}session_id={CHECKOUT_SESSION_ID}&paid=true`
+    const cancelUrl = `${returnUrl}${returnUrl.includes('?') ? '&' : '?'}checkout=canceled`
 
     const session = await createStripeCheckoutSession({
       customerId,
       tripId,
       tripName: ownerTrip.name,
-      successUrl: successUrl.toString(),
-      cancelUrl: cancelUrl.toString(),
+      successUrl,
+      cancelUrl,
     })
 
     if (!session.url) {
