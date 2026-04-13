@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { ArrowLeft, Check, Loader2, Sparkles } from 'lucide-react'
+import { ArrowLeft, Check, Loader2, Sparkles, Zap } from 'lucide-react'
 import { OutTheGCLogo } from '@/components/tripsync/outthegc-logo'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -29,6 +29,7 @@ function formatDateRange(from: Date, to: Date) {
 }
 
 export function PricingPage({ tripId, returnTo, sessionId, paid, checkout }: PricingPageProps) {
+  const [mounted, setMounted] = useState(false)
   const [data, setData] = useState<TripPlanPageData | null>(null)
   const [isLoading, setIsLoading] = useState(Boolean(tripId))
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -38,6 +39,10 @@ export function PricingPage({ tripId, returnTo, sessionId, paid, checkout }: Pri
   const [checkoutMessage, setCheckoutMessage] = useState<string | null>(null)
   const [isStartingCheckout, setIsStartingCheckout] = useState(false)
   const [isVerifyingCheckout, setIsVerifyingCheckout] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   useEffect(() => {
     if (!tripId) {
@@ -234,7 +239,23 @@ export function PricingPage({ tripId, returnTo, sessionId, paid, checkout }: Pri
 
   return (
     <main className="min-h-screen bg-background">
-      <div className="mx-auto flex max-w-6xl flex-col gap-8 px-4 py-6 sm:px-6 lg:px-8">
+      <div className="relative mx-auto flex max-w-6xl flex-col gap-8 px-4 py-6 sm:px-6 lg:px-8">
+        <div className="pointer-events-none absolute inset-x-0 top-6 -z-10 h-[720px] overflow-hidden">
+          <div
+            className={`absolute -left-20 top-6 h-72 w-72 rounded-full bg-gradient-to-br from-primary/25 via-primary/10 to-transparent blur-3xl transition-opacity duration-1000 ${
+              mounted ? 'opacity-100' : 'opacity-0'
+            }`}
+            style={{ animation: mounted ? 'pricingFloat 9s ease-in-out infinite' : 'none' }}
+          />
+          <div
+            className={`absolute right-0 top-24 h-80 w-80 rounded-full bg-gradient-to-bl from-accent/18 via-accent/8 to-transparent blur-3xl transition-opacity duration-1000 ${
+              mounted ? 'opacity-100' : 'opacity-0'
+            }`}
+            style={{ animation: mounted ? 'pricingFloat 11s ease-in-out infinite reverse' : 'none' }}
+          />
+          <div className="absolute left-1/2 top-32 h-64 w-64 -translate-x-1/2 rounded-full bg-gradient-to-r from-primary/8 via-accent/10 to-transparent blur-3xl" />
+        </div>
+
         <header className="flex flex-col gap-4 rounded-[28px] border border-border/60 bg-card/90 px-6 py-5 shadow-sm backdrop-blur sm:flex-row sm:items-center sm:justify-between">
           <Link href="/" className="w-fit">
             <OutTheGCLogo markClassName="h-9 w-9" textClassName="h-7" />
@@ -259,37 +280,100 @@ export function PricingPage({ tripId, returnTo, sessionId, paid, checkout }: Pri
         </header>
 
         <section className="overflow-hidden rounded-[36px] border border-primary/20 bg-[radial-gradient(circle_at_top_left,rgba(66,183,245,0.24),transparent_35%),radial-gradient(circle_at_top_right,rgba(79,224,188,0.18),transparent_30%),linear-gradient(180deg,rgba(255,255,255,0.88),rgba(245,247,255,0.94))] px-6 py-12 shadow-[0_30px_90px_rgba(78,110,190,0.12)] sm:px-10">
-          <div className="mx-auto max-w-4xl text-center">
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">Pricing</p>
-            <h1 className="mt-5 text-5xl font-semibold tracking-tight text-foreground sm:text-6xl">
-              Start free.
-              <span className="block text-balance text-muted-foreground">Upgrade each event only when you want AI help.</span>
-            </h1>
-            <p className="mx-auto mt-6 max-w-2xl text-lg leading-8 text-muted-foreground">
-              OutTheGC stays free for the core planning flow. OutTheGC Plus is a one-time unlock per event for unlimited AI organization, with more paid perks coming later.
-            </p>
-            {tripId && data?.trip ? (
-              <div className="mx-auto mt-8 flex w-fit flex-wrap items-center gap-3 rounded-full border border-border/60 bg-background/80 px-4 py-2 text-sm text-foreground shadow-sm">
-                <span className="font-semibold">Current event:</span>
-                <span>{data.trip.name}</span>
-                <span className="text-muted-foreground">
-                  {formatDateRange(parseStoredDate(data.trip.startDate), parseStoredDate(data.trip.endDate))}
-                </span>
+          <div className="mx-auto grid max-w-5xl items-center gap-10 lg:grid-cols-[1.1fr_0.9fr]">
+            <div
+              className="text-center lg:text-left"
+              style={{ animation: mounted ? 'pricingSlideUp 0.8s ease-out both' : 'none' }}
+            >
+              <p className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3.5 py-1.5 text-xs font-semibold uppercase tracking-[0.22em] text-primary">
+                <span className="h-2 w-2 rounded-full bg-primary animate-pulse" />
+                Pricing
+              </p>
+              <h1 className="mt-5 text-5xl font-semibold tracking-tight text-foreground sm:text-6xl">
+                Start free.
+                <span className="block text-balance text-muted-foreground">Upgrade each event only when you want AI help.</span>
+              </h1>
+              <p className="mt-6 max-w-2xl text-lg leading-8 text-muted-foreground lg:max-w-xl">
+                OutTheGC stays free for the core planning flow. OutTheGC Plus is a one-time unlock per event for unlimited AI organization, with more paid perks coming later.
+              </p>
+              {tripId && data?.trip ? (
+                <div className="mt-8 flex w-fit flex-wrap items-center gap-3 rounded-full border border-border/60 bg-background/80 px-4 py-2 text-sm text-foreground shadow-sm max-lg:mx-auto">
+                  <span className="font-semibold">Current event:</span>
+                  <span>{data.trip.name}</span>
+                  <span className="text-muted-foreground">
+                    {formatDateRange(parseStoredDate(data.trip.startDate), parseStoredDate(data.trip.endDate))}
+                  </span>
+                </div>
+              ) : (
+                <div className="mt-8 w-fit rounded-full border border-border/60 bg-background/80 px-4 py-2 text-sm text-muted-foreground shadow-sm max-lg:mx-auto">
+                  No account system yet, so Plus is unlocked per event.
+                </div>
+              )}
+            </div>
+
+            <div
+              className="relative flex items-center justify-center"
+              style={{ animation: mounted ? 'pricingSlideUp 0.8s ease-out 0.15s both' : 'none' }}
+            >
+              <div className="relative w-full max-w-sm">
+                <div
+                  className="absolute inset-x-8 top-10 rounded-[28px] border border-border/50 bg-card/80 p-5 shadow-xl backdrop-blur-sm"
+                  style={{
+                    transform: 'translateY(28px) rotate(-7deg)',
+                    animation: mounted ? 'pricingCardDrift 5s ease-in-out infinite' : 'none',
+                  }}
+                >
+                  <p className="text-sm font-semibold text-foreground">Free</p>
+                  <p className="mt-4 text-4xl font-semibold text-foreground">Shared doc</p>
+                  <div className="mt-6 space-y-2 text-sm text-muted-foreground">
+                    <p>Collect responses</p>
+                    <p>Compare dates</p>
+                    <p>Lock destination</p>
+                  </div>
+                </div>
+
+                <div
+                  className="relative rounded-[32px] border border-primary/30 bg-[linear-gradient(180deg,rgba(79,224,188,0.1),rgba(255,255,255,0.94))] p-6 shadow-[0_30px_80px_rgba(61,153,199,0.18)]"
+                  style={{ animation: mounted ? 'pricingCardLift 4s ease-in-out infinite' : 'none' }}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="inline-flex items-center gap-2 rounded-full bg-primary/12 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-primary">
+                      <Zap className="size-3.5" />
+                      Plus
+                    </div>
+                    <div className="h-3 w-3 rounded-full bg-primary animate-pulse" />
+                  </div>
+                  <p className="mt-5 text-5xl font-semibold tracking-tight text-foreground">$5</p>
+                  <p className="mt-2 text-sm text-muted-foreground">One-time unlock for one event</p>
+                  <div className="mt-6 rounded-2xl border border-primary/20 bg-background/80 px-4 py-3">
+                    <p className="text-sm font-semibold text-foreground">Unlimited AI organization</p>
+                    <p className="mt-1 text-sm text-muted-foreground">Turn rough notes into clean plans instantly.</p>
+                  </div>
+                  <div className="mt-6 grid grid-cols-2 gap-3">
+                    <div className="rounded-2xl bg-primary/10 p-3 text-center">
+                      <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Best for</p>
+                      <p className="mt-1 text-sm font-semibold text-foreground">Messy group plans</p>
+                    </div>
+                    <div className="rounded-2xl bg-accent/8 p-3 text-center">
+                      <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Unlocks</p>
+                      <p className="mt-1 text-sm font-semibold text-foreground">AI cleanup</p>
+                    </div>
+                  </div>
+                </div>
               </div>
-            ) : (
-              <div className="mx-auto mt-8 w-fit rounded-full border border-border/60 bg-background/80 px-4 py-2 text-sm text-muted-foreground shadow-sm">
-                No account system yet, so Plus is unlocked per event.
-              </div>
-            )}
+            </div>
           </div>
         </section>
 
-        <section className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
+        <section
+          className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr]"
+          style={{ animation: mounted ? 'pricingSlideUp 0.8s ease-out 0.25s both' : 'none' }}
+        >
           <PricingCard
             eyebrow="Free"
             priceLabel="Free"
             description="General access to the planning flow for any event."
-            buttonLabel="Included"
+            buttonLabel="Included by default"
             buttonVariant="outline"
             bullets={[
               'Create and share event links',
@@ -304,7 +388,7 @@ export function PricingPage({ tripId, returnTo, sessionId, paid, checkout }: Pri
             eyebrow="OutTheGC Plus"
             priceLabel={`$${data?.billing.priceUsd ?? 5} one-time`}
             description="Buy it for a single event when you want AI to clean up the mess."
-            buttonLabel={data?.billing.hasPlusAccess ? 'Unlocked for this event' : 'Unlock OutTheGC Plus'}
+            buttonLabel={data?.billing.hasPlusAccess ? 'Unlocked for this event' : 'This is the one'}
             buttonVariant="default"
             highlighted
             bullets={[
@@ -317,7 +401,10 @@ export function PricingPage({ tripId, returnTo, sessionId, paid, checkout }: Pri
           />
         </section>
 
-        <Card className="border-border/60 bg-card/95 shadow-sm">
+        <Card
+          className="border-border/60 bg-card/95 shadow-sm"
+          style={{ animation: mounted ? 'pricingSlideUp 0.8s ease-out 0.35s both' : 'none' }}
+        >
           <CardContent className="grid gap-6 p-6 lg:grid-cols-[1fr_0.9fr]">
             <div className="space-y-3">
               <p className="text-sm font-semibold text-foreground">How this works right now</p>
@@ -371,6 +458,11 @@ export function PricingPage({ tripId, returnTo, sessionId, paid, checkout }: Pri
                     {isStartingCheckout ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
                     {data?.billing.hasPlusAccess ? 'Already unlocked' : `Pay $${data?.billing.priceUsd ?? 5} for this event`}
                   </Button>
+                  <p className="rounded-2xl border border-primary/15 bg-background/80 px-4 py-3 text-sm font-medium text-foreground">
+                    {data?.billing.hasPlusAccess
+                      ? 'This event already has Plus access.'
+                      : 'Click the button above to unlock unlimited AI organization for this event.'}
+                  </p>
                   {checkoutMessage && <p className="text-sm text-foreground">{checkoutMessage}</p>}
                   {checkoutError && <p className="text-sm text-destructive">{checkoutError}</p>}
                   {loadError && <p className="text-sm text-destructive">{loadError}</p>}
@@ -402,6 +494,49 @@ export function PricingPage({ tripId, returnTo, sessionId, paid, checkout }: Pri
           <p>{shareUrl.replace(/^https?:\/\//, '')}</p>
         </footer>
       </div>
+
+      <style jsx>{`
+        @keyframes pricingSlideUp {
+          from {
+            opacity: 0;
+            transform: translateY(28px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
+        @keyframes pricingFloat {
+          0%,
+          100% {
+            transform: translateY(0px);
+          }
+          50% {
+            transform: translateY(-26px);
+          }
+        }
+
+        @keyframes pricingCardLift {
+          0%,
+          100% {
+            transform: translateY(0px);
+          }
+          50% {
+            transform: translateY(-16px);
+          }
+        }
+
+        @keyframes pricingCardDrift {
+          0%,
+          100% {
+            transform: translateY(28px) rotate(-7deg);
+          }
+          50% {
+            transform: translateY(8px) rotate(-7deg);
+          }
+        }
+      `}</style>
     </main>
   )
 }
@@ -427,8 +562,8 @@ function PricingCard({
     <div
       className={`rounded-[32px] border p-6 shadow-sm ${
         highlighted
-          ? 'border-primary/30 bg-[linear-gradient(180deg,rgba(79,224,188,0.08),rgba(66,183,245,0.08))]'
-          : 'border-border/60 bg-card/95'
+          ? 'border-primary/30 bg-[linear-gradient(180deg,rgba(79,224,188,0.1),rgba(66,183,245,0.08))] shadow-[0_28px_80px_rgba(61,153,199,0.18)]'
+          : 'border-border/60 bg-card/95 shadow-[0_18px_45px_rgba(35,44,92,0.08)]'
       }`}
     >
       <p className={`text-xs font-semibold uppercase tracking-[0.2em] ${highlighted ? 'text-primary' : 'text-muted-foreground'}`}>
@@ -436,7 +571,11 @@ function PricingCard({
       </p>
       <p className="mt-4 text-5xl font-semibold tracking-tight text-foreground">{priceLabel}</p>
       <p className="mt-4 text-base leading-7 text-muted-foreground">{description}</p>
-      <Button variant={buttonVariant} className="mt-6 w-full justify-center" disabled>
+      <Button
+        variant={buttonVariant}
+        className={`mt-6 w-full justify-center ${highlighted ? 'shadow-lg shadow-primary/25' : ''}`}
+        disabled
+      >
         {buttonLabel}
       </Button>
       <div className="mt-6 h-px bg-border/70" />
