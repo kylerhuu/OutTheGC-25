@@ -62,11 +62,35 @@ export async function POST(request: Request, context: RouteContext) {
 
     return NextResponse.json({ url: session.url })
   } catch (error) {
+    const configuredPriceId = process.env.STRIPE_PLUS_PRICE_ID || null
+
     if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: 'Enter a valid billing email.' }, { status: 400 })
+      return NextResponse.json(
+        {
+          error: 'Enter a valid billing email.',
+          debug:
+            process.env.NODE_ENV === 'production'
+              ? undefined
+              : {
+                  stripePriceId: configuredPriceId,
+                },
+        },
+        { status: 400 },
+      )
     }
 
     const message = error instanceof Error ? error.message : 'Unable to start checkout.'
-    return NextResponse.json({ error: message }, { status: 400 })
+    return NextResponse.json(
+      {
+        error: message,
+        debug:
+          process.env.NODE_ENV === 'production'
+            ? undefined
+            : {
+                stripePriceId: configuredPriceId,
+              },
+      },
+      { status: 400 },
+    )
   }
 }
